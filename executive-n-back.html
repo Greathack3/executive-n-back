@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Executive N-Back</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #08080f;
+  --bg-secondary: #0e0e1a;
+  --bg-card: #151528;
+  --bg-card-hover: #1c1c38;
+  --bg-input: #0a0a14;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0cc;
+  --text-muted: #6b6b85;
+  --accent: #8b5cf6;
+  --accent-light: #a78bfa;
+  --accent-glow: rgba(139, 92, 246, 0.35);
+  --accent-glow-strong: rgba(139, 92, 246, 0.6);
+  --success: #10b981;
+  --success-glow: rgba(16, 185, 129, 0.4);
+  --error: #ef4444;
+  --error-glow: rgba(239, 68, 68, 0.4);
+  --warning: #f59e0b;
+  --warning-glow: rgba(245, 158, 11, 0.4);
+  --info: #3b82f6;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  --radius: 18px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background:
+    radial-gradient(ellipse at 15% 20%, rgba(139, 92, 246, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 75%, rgba(217, 70, 239, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.03) 0%, transparent 60%);
+  animation: bgShift 25s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes bgShift {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(1%, 1%) rotate(0.5deg) scale(1.02); }
+  100% { transform: translate(-0.5%, 1.5%) rotate(-0.3deg) scale(1.01); }
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============ HEADER ============ */
+.header { text-align: center; margin-bottom: 1.5rem; }
+.header h1 {
+  font-size: 2.8rem; font-weight: 900;
+  background: linear-gradient(135deg, #fff 0%, var(--accent-light) 50%, #d946ef 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: 0.5rem; letter-spacing: -0.03em;
+}
+.header p { color: var(--text-secondary); font-size: 1rem; line-height: 1.6; max-width: 550px; margin: 0 auto; }
+.header p kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.6rem; height: 1.6rem; padding: 0 0.4rem;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+  font-family: inherit; font-size: 0.75rem; font-weight: 700; color: var(--accent-light);
+}
+
+/* ============ TABS ============ */
+.tab-bar {
+  display: flex; gap: 0.5rem; margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border); padding-bottom: 0;
+}
+.tab-btn {
+  padding: 0.7rem 1.4rem; background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--text-muted); font-family: inherit; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; transition: all var(--transition); white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text-secondary); }
+.tab-btn.active { color: var(--accent-light); border-bottom-color: var(--accent); }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ============ CARDS ============ */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.75rem;
+  backdrop-filter: blur(12px); transition: border-color var(--transition);
+}
+.card:hover { border-color: var(--border-hover); }
+.card-title {
+  font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 1.25rem;
+}
+
+/* ============ SETTINGS ============ */
+.settings-panel { margin-bottom: 1.5rem; }
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; }
+.setting-group { display: flex; flex-direction: column; gap: 0.5rem; }
+.setting-group label {
+  font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.setting-group select,
+.setting-group input[type="text"],
+.setting-group input[type="number"] {
+  width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-input);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-primary); font-family: inherit; font-size: 0.9rem; cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.setting-group select:focus,
+.setting-group input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.setting-group input[type="range"] {
+  -webkit-appearance: none; width: 100%; height: 6px;
+  background: var(--bg-input); border-radius: 3px; cursor: pointer; border: 1px solid var(--border);
+}
+.setting-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; box-shadow: 0 0 12px var(--accent-glow);
+  transition: transform var(--transition);
+}
+.setting-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.range-value { text-align: center; font-weight: 700; color: var(--accent-light); font-size: 1rem; }
+
+/* Info icon */
+.info-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(139, 92, 246, 0.15); color: var(--accent-light);
+  font-size: 0.65rem; font-weight: 700; cursor: help; flex-shrink: 0;
+  transition: all var(--transition); position: relative;
+}
+.info-icon:hover { background: var(--accent); color: white; }
+.info-tooltip {
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem; font-size: 0.78rem; font-weight: 400; color: var(--text-secondary);
+  width: 220px; text-align: left; line-height: 1.5; z-index: 1000;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  box-shadow: var(--shadow); text-transform: none; letter-spacing: 0;
+}
+.info-icon:hover .info-tooltip { opacity: 1; }
+
+/* Toggle */
+.toggle-group { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; }
+.toggle {
+  position: relative; width: 44px; height: 24px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 12px; cursor: pointer; transition: all var(--transition);
+}
+.toggle.active { background: var(--accent); border-color: var(--accent); }
+.toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; background: white; border-radius: 50%;
+  transition: transform var(--transition);
+}
+.toggle.active::after { transform: translateX(20px); }
+
+/* Mode selection */
+.mode-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.mode-item {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 0.85rem 1rem; background: var(--bg-input);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; transition: all var(--transition); user-select: none;
+}
+.mode-item:hover { border-color: var(--border-hover); }
+.mode-item.active { border-color: var(--accent); background: rgba(139, 92, 246, 0.08); }
+.mode-item .mode-check {
+  width: 22px; height: 22px; border: 2px solid var(--text-muted); border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition); font-size: 0.75rem; flex-shrink: 0;
+}
+.mode-item.active .mode-check { background: var(--accent); border-color: var(--accent); color: white; }
+.mode-item .mode-info { flex: 1; }
+.mode-item .mode-name { font-weight: 600; font-size: 0.9rem; }
+.mode-item .mode-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+.mode-item .mode-key {
+  padding: 0.35rem 0.75rem; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); color: var(--accent-light); font-family: inherit;
+  font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all var(--transition);
+  min-width: 50px; text-align: center;
+}
+.mode-item .mode-key:hover { border-color: var(--accent); }
+.mode-item .mode-key.listening { border-color: var(--accent); animation: pulse-border 1s ease infinite; }
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* ============ EXPLAINER ============ */
+.explainer-content { line-height: 1.8; color: var(--text-secondary); font-size: 0.92rem; }
+.explainer-content h3 {
+  color: var(--text-primary); font-size: 1.1rem; font-weight: 700;
+  margin: 1.5rem 0 0.75rem; display: flex; align-items: center; gap: 0.5rem;
+}
+.explainer-content h3:first-child { margin-top: 0; }
+.explainer-content p { margin-bottom: 1rem; }
+.explainer-content strong { color: var(--accent-light); }
+.explainer-content .highlight-box {
+  background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: var(--radius-sm); padding: 1rem 1.25rem; margin: 1rem 0;
+}
+.explainer-content .highlight-box.warning {
+  background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.2);
+}
+.explainer-content .highlight-box.success {
+  background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.2);
+}
+.explainer-content ul { margin: 0.5rem 0 1rem 1.25rem; }
+.explainer-content li { margin-bottom: 0.4rem; }
+.explainer-content .example-sequence {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  padding: 0.75rem 1rem; background: var(--bg-input); border-radius: var(--radius-sm);
+  margin: 0.75rem 0; font-family: monospace; font-size: 0.9rem;
+}
+.explainer-content .example-sequence .arrow { color: var(--text-muted); }
+.explainer-content .example-sequence .stim {
+  padding: 0.3rem 0.6rem; background: var(--bg-card); border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+}
+.explainer-content .example-sequence .stim.target { border-color: var(--success); color: var(--success); }
+.explainer-content .example-sequence .stim.nontarget { border-color: var(--error); color: var(--error); }
+
+/* ============ GAME AREA ============ */
+.game-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.75rem; }
+.stats-bar { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; }
+.stat { text-align: center; min-width: 70px; }
+.stat-value { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.stat-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.2rem; }
+
+/* Stimulus */
+.stimulus-container { position: relative; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; }
+.stimulus {
+  width: 170px; height: 170px; background: var(--bg-card);
+  border: 2px solid var(--border); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.5rem; font-weight: 800;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: var(--shadow); user-select: none; position: relative; overflow: hidden;
+}
+.stimulus.active { border-color: var(--accent); box-shadow: 0 0 50px var(--accent-glow), var(--shadow); transform: scale(1.06); }
+.stimulus.target-flash { border-color: var(--success); box-shadow: 0 0 50px var(--success-glow); }
+.stimulus.miss-flash { border-color: var(--error); box-shadow: 0 0 50px var(--error-glow); }
+.stimulus-shape { width: 90px; height: 90px; }
+
+/* Mode indicator on stimulus */
+.stimulus-mode-indicator {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  font-size: 0.6rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap;
+}
+
+/* Progress ring */
+.progress-ring { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.progress-ring circle { fill: none; stroke-width: 3; }
+.progress-ring .bg { stroke: var(--border); }
+.progress-ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.3s ease; filter: drop-shadow(0 0 4px var(--accent-glow)); }
+
+/* Feedback */
+.feedback { height: 2.2rem; font-size: 1.15rem; font-weight: 700; opacity: 0; transition: opacity 0.15s; letter-spacing: 0.02em; }
+.feedback.show { opacity: 1; }
+.feedback.correct { color: var(--success); }
+.feedback.wrong { color: var(--error); }
+.feedback.miss { color: var(--warning); }
+
+/* N-Back info */
+.nback-info { text-align: center; padding: 1rem 1.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); max-width: 450px; }
+.nback-info .rule { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; }
+.nback-info .rule strong { color: var(--accent-light); }
+.nback-info .example { margin-top: 0.6rem; font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
+
+/* Active keys display */
+.active-keys {
+  display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+}
+.active-key-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 0.85rem; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 0.8rem; color: var(--text-secondary);
+}
+.active-key-item kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.6rem; height: 1.6rem; padding: 0 0.35rem;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px;
+  font-family: inherit; font-size: 0.75rem; font-weight: 700; color: var(--accent-light);
+  transition: all 0.15s ease;
+}
+.active-key-item kbd.pressed {
+  background: var(--accent); color: white; border-color: var(--accent);
+  box-shadow: 0 0 15px var(--accent-glow-strong), 0 0 30px var(--accent-glow);
+  transform: scale(1.15);
+}
+
+/* Controls */
+.controls { display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; }
+.btn {
+  padding: 0.8rem 1.8rem; border: none; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  transition: all var(--transition); text-transform: uppercase; letter-spacing: 0.06em;
+}
+.btn-primary { background: linear-gradient(135deg, var(--accent), #7c3aed); color: white; box-shadow: 0 4px 18px var(--accent-glow); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 25px var(--accent-glow-strong); }
+.btn-primary:active { transform: translateY(0); box-shadow: 0 0 30px var(--accent-glow-strong), 0 0 60px var(--accent-glow); filter: brightness(1.3); }
+.btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg-card-hover); color: var(--text-primary); border-color: var(--border-hover); }
+.btn-secondary:active { box-shadow: 0 0 20px var(--accent-glow); filter: brightness(1.2); border-color: var(--accent); }
+.btn-danger { background: rgba(239, 68, 68, 0.15); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.3); }
+.btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+.btn-danger:active { box-shadow: 0 0 20px var(--error-glow); filter: brightness(1.3); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ============ VFX CANVAS ============ */
+#vfxCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1000; }
+
+/* ============ TELEMETRY ============ */
+.telemetry-panel { margin-top: 1.5rem; }
+.telemetry-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+.telemetry-stat { padding: 1rem; background: var(--bg-input); border-radius: var(--radius-sm); text-align: center; }
+.telemetry-stat .value { font-size: 1.4rem; font-weight: 800; color: var(--accent-light); }
+.telemetry-stat .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.25rem; }
+.chart-container { background: var(--bg-input); border-radius: var(--radius-sm); padding: 1rem; margin-top: 1rem; }
+.chart-container h4 { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem; }
+.chart-bars { display: flex; align-items: flex-end; gap: 3px; height: 80px; }
+.chart-bar {
+  flex: 1; background: linear-gradient(to top, var(--accent), var(--accent-light));
+  border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.5s ease; position: relative;
+}
+.chart-bar:hover { opacity: 0.8; }
+.chart-bar::after {
+  content: attr(data-value); position: absolute; top: -18px; left: 50%;
+  transform: translateX(-50%); font-size: 0.6rem; color: var(--text-muted);
+  white-space: nowrap; opacity: 0; transition: opacity 0.2s;
+}
+.chart-bar:hover::after { opacity: 1; }
+
+/* ============ SUMMARY ============ */
+.summary-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 2.5rem; text-align: center; max-width: 550px; margin: 0 auto; }
+.summary-card h2 {
+  font-size: 2rem; font-weight: 800; margin-bottom: 0.4rem;
+  background: linear-gradient(135deg, #fff, var(--accent-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.summary-card .subtitle { color: var(--text-secondary); margin-bottom: 2rem; font-size: 0.95rem; }
+.summary-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+.summary-stat { padding: 1.25rem; background: var(--bg-input); border-radius: var(--radius-sm); }
+.summary-stat .value { font-size: 1.6rem; font-weight: 800; color: var(--accent-light); }
+.summary-stat .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.3rem; }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 600px) {
+  .app { padding: 1rem; }
+  .header h1 { font-size: 1.8rem; }
+  .header p { font-size: 0.85rem; }
+  .stimulus-container { width: 170px; height: 170px; }
+  .stimulus { width: 130px; height: 130px; font-size: 1.8rem; }
+  .stats-bar { gap: 1rem; }
+  .stat-value { font-size: 1.2rem; }
+  .summary-stats { grid-template-columns: 1fr; }
+  .settings-grid { grid-template-columns: 1fr; }
+  .btn { padding: 0.7rem 1.2rem; font-size: 0.8rem; }
+  .tab-btn { padding: 0.6rem 0.8rem; font-size: 0.75rem; }
+}
+
+/* ============ UTILITY ============ */
+.hidden { display: none !important; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+.pulse { animation: pulse 0.4s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.4s ease forwards; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+.slide-up { animation: slideUp 0.5s ease forwards; }
+
+.combo-display {
+  position: fixed; top: 20px; right: 20px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 0.6rem 1rem;
+  font-weight: 800; font-size: 1.1rem; color: var(--accent-light);
+  z-index: 100; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.combo-display.show { opacity: 1; }
+.combo-display .combo-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+.sound-toggle {
+  position: fixed; top: 20px; left: 20px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 0.5rem 0.85rem;
+  cursor: pointer; z-index: 100; transition: all var(--transition);
+  font-size: 1.1rem; color: var(--text-secondary);
+}
+.sound-toggle:hover { border-color: var(--accent); color: var(--text-primary); }
+
+.history-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.history-table th { text-align: left; padding: 0.5rem 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.08em; border-bottom: 1px solid var(--border); }
+.history-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+.history-table tr:hover td { background: rgba(139, 92, 246, 0.05); }
+.history-table .good { color: var(--success); }
+.history-table .bad { color: var(--error); }
+</style>
+</head>
+<body>
+
+<canvas id="vfxCanvas"></canvas>
+<button class="sound-toggle" id="soundToggle" title="Toggle Sound">🔊</button>
+<div class="combo-display" id="comboDisplay"><span class="combo-label">Combo</span> <span id="comboValue">0</span></div>
+
+<div class="app">
+  <header class="header">
+    <h1>Executive N-Back</h1>
+    <p>Press the mode's key when the current stimulus is the one that comes <strong>immediately after</strong> the stimulus shown N positions ago.</p>
+  </header>
+
+  <!-- ============ MAIN MENU ============ -->
+  <div id="mainMenu">
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="settings">⚙️ Customize</button>
+    <button class="tab-btn" data-tab="explainer">📖 How It Works</button>
+    <button class="tab-btn" data-tab="progress">📈 Progress</button>
+  </div>
+
+  <!-- ============ SETTINGS TAB ============ -->
+  <div class="tab-content active" id="tab-settings">
+    <div class="card settings-panel">
+      <div class="card-title">⚙️ Customize Your Session</div>
+      <div class="settings-grid">
+        <div class="setting-group">
+          <label>🎯 N-Back Level <span class="info-icon">i<span class="info-tooltip">The number of positions back to compare against. Higher N = harder. Starts at 2 and adapts based on performance.</span></span></label>
+          <input type="range" id="nLevel" min="1" max="50" value="2">
+          <div class="range-value" id="nValue">2-Back</div>
+        </div>
+        <div class="setting-group">
+          <label>⏱️ Stimulus Duration <span class="info-icon">i<span class="info-tooltip">How long each stimulus stays on screen before disappearing. Shorter = faster pace.</span></span></label>
+          <input type="range" id="stimulusDuration" min="300" max="5000" step="100" value="1500">
+          <div class="range-value" id="durationValue">1500ms</div>
+        </div>
+        <div class="setting-group">
+          <label>⏸️ Inter-Stimulus Interval <span class="info-icon">i<span class="info-tooltip">The blank pause between stimuli. This is your processing time.</span></span></label>
+          <input type="range" id="isiDuration" min="100" max="3000" step="50" value="500">
+          <div class="range-value" id="isiValue">500ms</div>
+        </div>
+        <div class="setting-group">
+          <label>📊 Blocks per Session <span class="info-icon">i<span class="info-tooltip">How many blocks (rounds) make up one full session. The original study used 20 blocks.</span></span></label>
+          <input type="range" id="blocksPerSession" min="1" max="50" value="20">
+          <div class="range-value" id="blocksValue">20</div>
+        </div>
+        <div class="setting-group">
+          <label>🎯 Targets per Block <span class="info-icon">i<span class="info-tooltip">How many correct responses (targets) appear in each block. The original study used 6 targets out of 20 trials.</span></span></label>
+          <input type="range" id="targetsPerBlock" min="1" max="19" value="6">
+          <div class="range-value" id="targetsValue">6</div>
+        </div>
+        <div class="setting-group">
+          <label>💬 Feedback <span class="info-icon">i<span class="info-tooltip">Show visual feedback for correct answers, false alarms, and misses. Disable to remove all feedback including sound.</span></span></label>
+          <div class="toggle-group">
+            <span style="font-size:0.8rem;color:var(--text-muted)">Enabled</span>
+            <div class="toggle active" id="feedbackToggleSetting"></div>
+          </div>
+        </div>
+        <div class="setting-group" id="soundSettingGroup">
+          <label>🔊 Sound Effects <span class="info-icon">i<span class="info-tooltip">Play audio feedback for correct answers, false alarms, and misses. Only available when feedback is enabled.</span></span></label>
+          <div class="toggle-group">
+            <span style="font-size:0.8rem;color:var(--text-muted)">Enabled</span>
+            <div class="toggle active" id="soundToggleSetting"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Selection with per-mode keys -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <div class="card-title">🧠 Training Modes — Select & Assign Keys</div>
+      <div class="mode-list" id="modeList">
+        <div class="mode-item active" data-mode="days">
+          <div class="mode-check">✓</div>
+          <div class="mode-info">
+            <div class="mode-name">📅 Days of the Week</div>
+            <div class="mode-desc">MON → TUE → WED → THU → FRI → SAT → SUN</div>
+          </div>
+          <button class="mode-key" data-mode="days">J</button>
+        </div>
+        <div class="mode-item active" data-mode="months">
+          <div class="mode-check">✓</div>
+          <div class="mode-info">
+            <div class="mode-name">📆 Months</div>
+            <div class="mode-desc">JAN → FEB → MAR → ... → DEC</div>
+          </div>
+          <button class="mode-key" data-mode="months">K</button>
+        </div>
+        <div class="mode-item active" data-mode="alphabet">
+          <div class="mode-check">✓</div>
+          <div class="mode-info">
+            <div class="mode-name">🔤 Alphabet</div>
+            <div class="mode-desc">A → B → C → ... → Z</div>
+          </div>
+          <button class="mode-key" data-mode="alphabet">L</button>
+        </div>
+        <div class="mode-item active" data-mode="shapes">
+          <div class="mode-check">✓</div>
+          <div class="mode-info">
+            <div class="mode-name">🔷 Shapes</div>
+            <div class="mode-desc">Circle → Square → Triangle → Diamond → Pentagon → Hexagon → Star → Cross</div>
+          </div>
+          <button class="mode-key" data-mode="shapes">;</button>
+        </div>
+      </div>
+      <p style="margin-top:1rem;font-size:0.78rem;color:var(--text-muted)">
+        💡 Click a key button then press any key to rebind. Each mode has its own independent response key. When multiple modes are active, stimuli from all selected modes are mixed together — press the key matching the current stimulus type.
+      </p>
+    </div>
+
+    <div class="controls" style="margin-bottom:2rem">
+      <button class="btn btn-primary" id="startBtn" style="font-size:1rem;padding:1rem 2.5rem">▶ Start Session</button>
+    </div>
+  </div>
+
+  <!-- ============ EXPLAINER TAB ============ -->
+  <div class="tab-content" id="tab-explainer">
+    <div class="card">
+      <div class="explainer-content">
+        <h3>🧠 What is Executive N-Back?</h3>
+        <p>The <strong>Executive N-Back</strong> is a cognitive training task that challenges your working memory and executive function. Unlike the classic N-Back task (where you match the current item to one shown N steps ago), the Executive version adds a <strong>transformation step</strong>: you must mentally advance the N-back item by one position in a sequence.</p>
+
+        <div class="highlight-box">
+          <strong>Classic N-Back:</strong> Press when current = item N-back<br>
+          <strong>Executive N-Back:</strong> Press when current = <em>next after</em> item N-back
+        </div>
+
+        <h3>📋 How It Works</h3>
+        <p>You see a sequence of stimuli (days, months, letters, or shapes). For each stimulus, you must determine:</p>
+        <ul>
+          <li>What was shown <strong>N positions ago</strong>?</li>
+          <li>What comes <strong>immediately after</strong> that item in the sequence?</li>
+          <li>Does the current stimulus match that "next" item?</li>
+        </ul>
+        <p>If yes — press your response key. If no — withhold your response.</p>
+
+        <h3>📝 Example (2-Back, Days)</h3>
+        <div class="example-sequence">
+          <span class="stim">MON</span>
+          <span class="arrow">→</span>
+          <span class="stim">FRI</span>
+          <span class="arrow">→</span>
+          <span class="stim target">TUE</span>
+          <span class="arrow">=</span>
+          <span style="color:var(--success);font-weight:700">PRESS ✓</span>
+        </div>
+        <p>Two positions back was <strong>Monday</strong>. The day immediately after Monday is <strong>Tuesday</strong>. The current stimulus is Tuesday — so you press.</p>
+
+        <div class="example-sequence">
+          <span class="stim">SUN</span>
+          <span class="arrow">→</span>
+          <span class="stim">WED</span>
+          <span class="arrow">→</span>
+          <span class="stim target">MON</span>
+          <span class="arrow">=</span>
+          <span style="color:var(--success);font-weight:700">PRESS ✓</span>
+        </div>
+        <p>Two positions back was <strong>Sunday</strong>. The day after Sunday is <strong>Monday</strong>. Current = Monday — press.</p>
+
+        <div class="example-sequence">
+          <span class="stim">MON</span>
+          <span class="arrow">→</span>
+          <span class="stim">FRI</span>
+          <span class="arrow">→</span>
+          <span class="stim nontarget">MON</span>
+          <span class="arrow">=</span>
+          <span style="color:var(--error);font-weight:700">DO NOTHING ✗</span>
+        </div>
+        <p>Two positions back was <strong>Monday</strong>. The day after Monday is <strong>Tuesday</strong>, not Monday. Even though the item matches the N-back item, this is <em>not</em> a target in Executive N-Back.</p>
+
+        <h3>🔬 The Study Protocol</h3>
+        <p>The original Executive N-Back study used an <strong>adaptive difficulty</strong> protocol:</p>
+        <ul>
+          <li><strong>19–20 correct</strong> in a block → N increases by 1</li>
+          <li><strong>16–18 correct</strong> → N stays the same</li>
+          <li><strong>0–15 correct</strong> → N decreases by 1 (minimum 1)</li>
+        </ul>
+        <p>Each block contains <strong>N warm-up stimuli</strong> (not scored) followed by <strong>20 scored decisions</strong> with exactly <strong>6 targets</strong> and 14 non-targets. Correctly withholding a response on a non-target counts as correct.</p>
+        <p>Sessions consisted of <strong>20 blocks</strong>. The first session began at 1-back, and subsequent sessions started at the previous session's final N minus 2.</p>
+
+        <h3>📊 What the Research Concludes</h3>
+        <div class="highlight-box success">
+          <strong>Key Finding:</strong> The Executive N-Back's transformation requirement ("What comes next?") places significantly higher demands on <strong>executive function</strong> than classic N-Back. This extra manipulation engages prefrontal cortex activity more intensely, making it a potentially more effective tool for cognitive training.
+        </div>
+        <p>Research on N-Back training suggests:</p>
+        <ul>
+          <li>Regular practice can improve <strong>working memory capacity</strong></li>
+          <li>The adaptive protocol ensures users are always working at the <strong>edge of their ability</strong></li>
+          <li>Executive N-Back may offer <strong>greater transfer effects</strong> to real-world cognitive tasks due to its added manipulation component</li>
+          <li>Consistent training over multiple sessions shows the most promise for measurable improvements</li>
+        </ul>
+
+        <div class="highlight-box warning">
+          <strong>Note:</strong> While N-Back training shows promise in research, results on far transfer (improvements in untrained cognitive tasks) remain mixed. This app is designed as a cognitive exercise tool, not a clinical intervention.
+        </div>
+
+        <h3>🎮 Controls</h3>
+        <ul>
+          <li><strong>Mode keys</strong> — Press the key assigned to the current stimulus type when it's a target</li>
+          <li><strong>Space</strong> — Pause / Resume</li>
+          <li><strong>Esc</strong> — Quit to main menu</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PROGRESS TAB ============ -->
+  <div class="tab-content" id="tab-progress">
+    <div class="card telemetry-panel">
+      <div class="card-title">📈 Your Progress</div>
+      <div class="telemetry-grid">
+        <div class="telemetry-stat"><div class="value" id="telSessions">0</div><div class="label">Sessions</div></div>
+        <div class="telemetry-stat"><div class="value" id="telBlocks">0</div><div class="label">Blocks</div></div>
+        <div class="telemetry-stat"><div class="value" id="telAccuracy">--</div><div class="label">Avg Accuracy</div></div>
+        <div class="telemetry-stat"><div class="value" id="telBestN">--</div><div class="label">Best N-Level</div></div>
+        <div class="telemetry-stat"><div class="value" id="telStreak">0</div><div class="label">Best Streak</div></div>
+        <div class="telemetry-stat"><div class="value" id="telTime">0m</div><div class="label">Total Time</div></div>
+      </div>
+      <div class="chart-container">
+        <h4>Recent Block Scores</h4>
+        <div class="chart-bars" id="performanceChart">
+          <div style="color:var(--text-muted);font-size:0.8rem;padding:1rem">Complete a session to see your progress</div>
+        </div>
+      </div>
+      <div class="chart-container" style="margin-top:1rem">
+        <h4>Session History</h4>
+        <div id="historyList" style="max-height:250px;overflow-y:auto">
+          <div style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem">No sessions yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div><!-- /mainMenu -->
+
+  <!-- ============ GAME AREA ============ -->
+  <div class="game-area hidden" id="gameArea">
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-value" id="blockNum">1</div><div class="stat-label">Block</div></div>
+      <div class="stat"><div class="stat-value" id="trialNum">0/20</div><div class="stat-label">Trial</div></div>
+      <div class="stat"><div class="stat-value" id="score">0</div><div class="stat-label">Score</div></div>
+      <div class="stat"><div class="stat-value" id="accuracy">--</div><div class="stat-label">Accuracy</div></div>
+      <div class="stat"><div class="stat-value" id="streak">0</div><div class="stat-label">Streak</div></div>
+    </div>
+
+    <div class="stimulus-container">
+      <svg class="progress-ring" width="220" height="220" viewBox="0 0 220 220">
+        <circle class="bg" cx="110" cy="110" r="100"></circle>
+        <circle class="fg" cx="110" cy="110" r="100" id="progressCircle" stroke-dasharray="628.32" stroke-dashoffset="628.32" transform="rotate(-90 110 110)"></circle>
+      </svg>
+      <div class="stimulus" id="stimulus">?</div>
+    </div>
+
+    <div class="feedback" id="feedback"></div>
+
+    <div class="nback-info" id="ruleInfo">
+      <div class="rule" id="ruleText"></div>
+      <div class="example" id="ruleExample"></div>
+    </div>
+
+    <div class="active-keys" id="activeKeys"></div>
+
+    <div class="controls">
+      <button class="btn btn-primary hidden" id="pauseBtn">Pause</button>
+      <button class="btn btn-danger hidden" id="quitBtn">Quit</button>
+    </div>
+  </div>
+
+  <!-- ============ SUMMARY ============ -->
+  <div class="summary-card hidden" id="summaryCard">
+    <h2>Session Complete!</h2>
+    <p class="subtitle">Great effort! Here's how you performed.</p>
+    <div class="summary-stats">
+      <div class="summary-stat"><div class="value" id="finalN">2</div><div class="label">Final N-Level</div></div>
+      <div class="summary-stat"><div class="value" id="finalScore">0</div><div class="label">Total Score</div></div>
+      <div class="summary-stat"><div class="value" id="finalAccuracy">0%</div><div class="label">Accuracy</div></div>
+    </div>
+    <div class="controls">
+      <button class="btn btn-primary" id="restartBtn">New Session</button>
+      <button class="btn btn-secondary" id="menuBtn">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ STIMULI DATA ============
+const STIMULI = {
+  days: {
+    items: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+    type: 'text',
+    label: 'Days',
+    rule: (n) => `Press the mode's key when the current day is the day <strong>immediately after</strong> the day shown ${n} position${n > 1 ? 's' : ''} ago.`,
+    example: () => `Example (2-back): MON → FRI → <strong>TUE</strong> = Press (Tuesday comes after Monday)`
+  },
+  months: {
+    items: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
+    type: 'text',
+    label: 'Months',
+    rule: (n) => `Press the mode's key when the current month is the month <strong>immediately after</strong> the month shown ${n} position${n > 1 ? 's' : ''} ago.`,
+    example: () => `Example (2-back): MAR → NOV → <strong>APR</strong> = Press (April comes after March)`
+  },
+  alphabet: {
+    items: ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'],
+    type: 'text',
+    label: 'Alphabet',
+    rule: (n) => `Press the mode's key when the current letter is the letter that comes <strong>immediately after</strong> the letter shown ${n} position${n > 1 ? 's' : ''} ago.`,
+    example: () => `Example (2-back): G → R → <strong>H</strong> = Press (H comes after G)`
+  },
+  shapes: {
+    type: 'shape',
+    label: 'Shapes',
+    items: [
+      { name: 'Circle', color: '#8b5cf6', gradient: ['#8b5cf6', '#6d28d9'], svg: '<circle cx="50" cy="50" r="32" fill="url(#shapeGrad)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>' },
+      { name: 'Square', color: '#3b82f6', gradient: ['#3b82f6', '#1d4ed8'], svg: '<rect x="20" y="20" width="60" height="60" rx="4" fill="url(#shapeGrad)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>' },
+      { name: 'Triangle', color: '#10b981', gradient: ['#10b981', '#047857'], svg: '<polygon points="50,18 82,78 18,78" fill="url(#shapeGrad)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>' },
+      { name: 'Diamond', color: '#f59e0b', gradient: ['#f59e0b', '#b45309'], svg: '<polygon points="50,12 88,50 50,88 12,50" fill="url(#shapeGrad)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>' },
+      { name: 'Pentagon', color: '#ef4444', gradient: ['#ef4444', '#b91c1c'], svg: '<polygon points="50,12 89,40 74,86 26,86 11,40" fill="url(#shapeGrad)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>' },
+      { name: 'Hexagon', color: '#ec4899', gradient: ['#ec4899', '#be185d'], svg: '<polygon points="50,10 87,30 87,70 50,90 13,70 13,30" fill="url(#shapeGrad)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>' },
+      { name: 'Star', color: '#06b6d4', gradient: ['#06b6d4', '#0e7490'], svg: '<polygon points="50,10 61,38 92,38 67,57 76,85 50,68 24,85 33,57 8,38 39,38" fill="url(#shapeGrad)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>' },
+      { name: 'Cross', color: '#a3e635', gradient: ['#a3e635', '#4d7c0f'], svg: '<path d="M35,12 h30 v23 h23 v30 h-23 v23 h-30 v-23 h-23 v-30 h23 z" fill="url(#shapeGrad)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>' }
+    ],
+    rule: (n) => `Press the mode's key when the current shape is the shape that comes <strong>immediately after</strong> the shape shown ${n} position${n > 1 ? 's' : ''} ago in the sequence.`,
+    example: () => `Example (2-back): Circle → Triangle → <strong>Square</strong> = Press (Square follows Circle in the sequence)`
+  }
+};
+
+const SHAPE_SEQUENCE = ['Circle', 'Square', 'Triangle', 'Diamond', 'Pentagon', 'Hexagon', 'Star', 'Cross'];
+
+// ============ AUDIO ENGINE ============
+class AudioEngine {
+  constructor() { this.enabled = true; this.ctx = null; this.initialized = false; }
+  init() {
+    if (this.initialized) return;
+    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); this.initialized = true; } catch (e) {}
+  }
+  playTone(freq, duration, type = 'sine', volume = 0.15, delay = 0) {
+    if (!this.enabled || !state.feedbackEnabled || !this.ctx) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + delay);
+    gain.gain.setValueAtTime(volume, this.ctx.currentTime + delay);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + delay + duration);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(this.ctx.currentTime + delay);
+    osc.stop(this.ctx.currentTime + delay + duration);
+  }
+  playCorrect() {
+    this.playTone(523.25, 0.15, 'sine', 0.12);
+    this.playTone(659.25, 0.15, 'sine', 0.12, 0.08);
+    this.playTone(783.99, 0.25, 'sine', 0.14, 0.16);
+    this.playTone(1046.5, 0.3, 'sine', 0.1, 0.24);
+  }
+  playWrong() { this.playTone(200, 0.2, 'sawtooth', 0.08); this.playTone(150, 0.3, 'sawtooth', 0.08, 0.1); }
+  playMiss() { this.playTone(300, 0.15, 'triangle', 0.1); this.playTone(250, 0.2, 'triangle', 0.1, 0.1); }
+  playStart() { this.playTone(440, 0.1, 'sine', 0.1); this.playTone(554.37, 0.1, 'sine', 0.1, 0.1); this.playTone(659.25, 0.2, 'sine', 0.12, 0.2); }
+  playBlockComplete() { this.playTone(523.25, 0.12, 'sine', 0.1); this.playTone(783.99, 0.2, 'sine', 0.12, 0.1); }
+  playSessionComplete() {
+    [523.25, 587.33, 659.25, 698.46, 783.99, 880, 987.77, 1046.5].forEach((f, i) => this.playTone(f, 0.2, 'sine', 0.1, i * 0.1));
+  }
+}
+const audio = new AudioEngine();
+
+// ============ VFX ENGINE ============
+class VFXEngine {
+  constructor() {
+    this.canvas = document.getElementById('vfxCanvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.particles = [];
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    this.animate();
+  }
+  resize() { this.canvas.width = window.innerWidth; this.canvas.height = window.innerHeight; }
+  burst(x, y, color, count = 30) {
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+      const speed = 2 + Math.random() * 6;
+      this.particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1, decay: 0.015 + Math.random() * 0.02, size: 2 + Math.random() * 4, color, type: Math.random() > 0.5 ? 'circle' : 'star' });
+    }
+  }
+  ringBurst(x, y, color) {
+    this.particles.push({ x, y, vx: 0, vy: 0, life: 1, decay: 0.03, size: 5, color, type: 'ring', radius: 10, maxRadius: 80 });
+  }
+  animate() {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.particles = this.particles.filter(p => p.life > 0);
+    for (const p of this.particles) {
+      p.life -= p.decay; p.x += p.vx; p.y += p.vy; p.vx *= 0.98; p.vy *= 0.98;
+      this.ctx.globalAlpha = p.life;
+      if (p.type === 'circle') { this.ctx.beginPath(); this.ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); this.ctx.fillStyle = p.color; this.ctx.fill(); }
+      else if (p.type === 'star') this.drawStar(p.x, p.y, p.size * p.life, p.color);
+      else if (p.type === 'ring') { p.radius += (p.maxRadius - p.radius) * 0.1; this.ctx.beginPath(); this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); this.ctx.strokeStyle = p.color; this.ctx.lineWidth = 2 * p.life; this.ctx.stroke(); }
+    }
+    this.ctx.globalAlpha = 1;
+    requestAnimationFrame(() => this.animate());
+  }
+  drawStar(cx, cy, size, color) {
+    this.ctx.save(); this.ctx.translate(cx, cy); this.ctx.beginPath();
+    for (let i = 0; i < 5; i++) { const a = (i * 4 * Math.PI) / 5 - Math.PI / 2; const x = Math.cos(a) * size; const y = Math.sin(a) * size; if (i === 0) this.ctx.moveTo(x, y); else this.ctx.lineTo(x, y); }
+    this.ctx.closePath(); this.ctx.fillStyle = color; this.ctx.fill(); this.ctx.restore();
+  }
+}
+const vfx = new VFXEngine();
+
+// ============ TELEMETRY ============
+class Telemetry {
+  constructor() { this.data = this.load(); }
+  load() {
+    try { const s = localStorage.getItem('executiveNBack_telemetry'); if (s) return JSON.parse(s); } catch (e) {}
+    return { sessions: [], totalBlocks: 0, totalTrials: 0, totalCorrect: 0, totalTimeMs: 0, bestN: 0, bestStreak: 0, recentScores: [] };
+  }
+  save() { try { localStorage.setItem('executiveNBack_telemetry', JSON.stringify(this.data)); } catch (e) {} }
+  recordSession(d) {
+    this.data.sessions.push({ date: new Date().toISOString(), ...d });
+    this.data.totalBlocks += d.blocksCompleted;
+    this.data.totalTrials += d.totalTrials;
+    this.data.totalCorrect += d.totalCorrect;
+    this.data.totalTimeMs += d.durationMs;
+    if (d.finalN > this.data.bestN) this.data.bestN = d.finalN;
+    if (d.bestStreak > this.data.bestStreak) this.data.bestStreak = d.bestStreak;
+    this.data.recentScores.push(...d.blockScores);
+    if (this.data.recentScores.length > 50) this.data.recentScores = this.data.recentScores.slice(-50);
+    if (this.data.sessions.length > 50) this.data.sessions = this.data.sessions.slice(-50);
+    this.save();
+  }
+  getStats() {
+    const avgAcc = this.data.totalTrials > 0 ? Math.round((this.data.totalCorrect / this.data.totalTrials) * 100) : 0;
+    return { sessions: this.data.sessions.length, blocks: this.data.totalBlocks, accuracy: avgAcc, bestN: this.data.bestN, bestStreak: this.data.bestStreak, time: Math.round(this.data.totalTimeMs / 60000) };
+  }
+  getRecentScores() { return this.data.recentScores.slice(-20); }
+  getSessionHistory() { return this.data.sessions.slice(-10).reverse(); }
+}
+const telemetry = new Telemetry();
+
+// ============ GAME STATE ============
+const state = {
+  nLevel: 2, stimulusDuration: 1500, isiDuration: 500,
+  blocksPerSession: 20, targetsPerBlock: 6,
+  activeModes: ['days', 'months', 'alphabet', 'shapes'],
+  modeKeys: { days: 'j', months: 'k', alphabet: 'l', shapes: ';' },
+  feedbackEnabled: true,
+  isRunning: false, isPaused: false, blockNumber: 0, sessionStartTime: 0,
+  sequence: [], currentIndex: 0, scoredCount: 0, blockScore: 0,
+  totalScore: 0, totalTrials: 0, totalCorrect: 0, blockScores: [],
+  bestStreak: 0, currentStreak: 0,
+  timer: null, isiTimer: null, canRespond: false, responded: false, isTarget: false, currentMode: null
+};
+
+// ============ DOM ELEMENTS ============
+const els = {
+  nLevel: document.getElementById('nLevel'), nValue: document.getElementById('nValue'),
+  stimulusDuration: document.getElementById('stimulusDuration'), durationValue: document.getElementById('durationValue'),
+  isiDuration: document.getElementById('isiDuration'), isiValue: document.getElementById('isiValue'),
+  blocksPerSession: document.getElementById('blocksPerSession'), blocksValue: document.getElementById('blocksValue'),
+  targetsPerBlock: document.getElementById('targetsPerBlock'), targetsValue: document.getElementById('targetsValue'),
+  feedbackToggleSetting: document.getElementById('feedbackToggleSetting'),
+  soundToggleSetting: document.getElementById('soundToggleSetting'),
+  soundSettingGroup: document.getElementById('soundSettingGroup'),
+  blockNum: document.getElementById('blockNum'), trialNum: document.getElementById('trialNum'),
+  score: document.getElementById('score'), accuracy: document.getElementById('accuracy'), streak: document.getElementById('streak'),
+  stimulus: document.getElementById('stimulus'), feedback: document.getElementById('feedback'),
+  progressCircle: document.getElementById('progressCircle'),
+  ruleText: document.getElementById('ruleText'), ruleExample: document.getElementById('ruleExample'),
+  activeKeys: document.getElementById('activeKeys'),
+  startBtn: document.getElementById('startBtn'), pauseBtn: document.getElementById('pauseBtn'), quitBtn: document.getElementById('quitBtn'),
+  restartBtn: document.getElementById('restartBtn'), menuBtn: document.getElementById('menuBtn'),
+  mainMenu: document.getElementById('mainMenu'), gameArea: document.getElementById('gameArea'), summaryCard: document.getElementById('summaryCard'),
+  finalN: document.getElementById('finalN'), finalScore: document.getElementById('finalScore'), finalAccuracy: document.getElementById('finalAccuracy'),
+  telSessions: document.getElementById('telSessions'), telBlocks: document.getElementById('telBlocks'),
+  telAccuracy: document.getElementById('telAccuracy'), telBestN: document.getElementById('telBestN'),
+  telStreak: document.getElementById('telStreak'), telTime: document.getElementById('telTime'),
+  performanceChart: document.getElementById('performanceChart'), historyList: document.getElementById('historyList'),
+  soundToggle: document.getElementById('soundToggle'),
+  comboDisplay: document.getElementById('comboDisplay'), comboValue: document.getElementById('comboValue')
+};
+
+// ============ HELPERS ============
+function getAllItems() {
+  let items = [];
+  for (const mode of state.activeModes) items = items.concat(STIMULI[mode].items);
+  return items;
+}
+
+function getModeForItem(item) {
+  for (const mode of state.activeModes) {
+    const set = STIMULI[mode];
+    if (set.type === 'shape') { if (set.items.find(s => s.name === item.name)) return mode; }
+    else { if (set.items.includes(item)) return mode; }
+  }
+  return state.activeModes[0];
+}
+
+function getNextItem(item) {
+  for (const mode of state.activeModes) {
+    const set = STIMULI[mode];
+    if (set.type === 'shape') {
+      const idx = set.items.findIndex(s => s.name === item.name);
+      if (idx !== -1) { const si = SHAPE_SEQUENCE.indexOf(item.name); return set.items.find(s => s.name === SHAPE_SEQUENCE[(si + 1) % SHAPE_SEQUENCE.length]); }
+    } else {
+      const idx = set.items.indexOf(item);
+      if (idx !== -1) return set.items[(idx + 1) % set.items.length];
+    }
+  }
+  return item;
+}
+
+function isCurrentTarget(sequence, index, n) {
+  if (index < n) return false;
+  const nBackItem = sequence[index - n];
+  const currentItem = sequence[index];
+  const nextAfterNBack = getNextItem(nBackItem);
+  if (typeof currentItem === 'object') return currentItem.name === nextAfterNBack.name;
+  return currentItem === nextAfterNBack;
+}
+
+function generateSequence(n, targetCount) {
+  const items = getAllItems();
+  const totalLength = n + 20;
+  const sequence = [];
+  for (let i = 0; i < totalLength; i++) sequence.push(items[Math.floor(Math.random() * items.length)]);
+  const scoredStart = n, scoredEnd = totalLength, scoredLength = scoredEnd - scoredStart;
+  let currentTargets = 0;
+  for (let i = scoredStart; i < scoredEnd; i++) if (isCurrentTarget(sequence, i, n)) currentTargets++;
+  let attempts = 0;
+  while (currentTargets !== targetCount && attempts < 2000) {
+    const idx = scoredStart + Math.floor(Math.random() * scoredLength);
+    const randomItem = items[Math.floor(Math.random() * items.length)];
+    const oldItem = sequence[idx];
+    sequence[idx] = randomItem;
+    let newCount = 0;
+    for (let i = scoredStart; i < scoredEnd; i++) if (isCurrentTarget(sequence, i, n)) newCount++;
+    if (Math.abs(newCount - targetCount) <= Math.abs(currentTargets - targetCount)) currentTargets = newCount;
+    else sequence[idx] = oldItem;
+    attempts++;
+  }
+  return sequence;
+}
+
+function renderStimulus(item) {
+  if (typeof item === 'object' && item.svg) {
+    els.stimulus.innerHTML = `<svg width="90" height="90" viewBox="0 0 100 100"><defs><linearGradient id="shapeGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:${item.gradient[0]}"/><stop offset="100%" style="stop-color:${item.gradient[1]}"/></linearGradient></defs>${item.svg}</svg>`;
+  } else {
+    els.stimulus.textContent = item;
+  }
+}
+
+function updateProgressRing(progress) {
+  const c = 2 * Math.PI * 100;
+  els.progressCircle.style.strokeDashoffset = c * (1 - progress);
+}
+
+function updateStats() {
+  els.blockNum.textContent = state.blockNumber;
+  els.trialNum.textContent = `${state.scoredCount}/20`;
+  els.score.textContent = state.totalScore;
+  els.streak.textContent = state.currentStreak;
+  els.accuracy.textContent = state.totalTrials > 0 ? `${Math.round((state.totalCorrect / state.totalTrials) * 100)}%` : '--';
+}
+
+function updateRuleInfo() {
+  const primaryMode = state.activeModes[0];
+  const set = STIMULI[primaryMode];
+  els.ruleText.innerHTML = set.rule(state.nLevel);
+  els.ruleExample.innerHTML = set.example();
+}
+
+function updateActiveKeysDisplay() {
+  els.activeKeys.innerHTML = state.activeModes.map(mode => {
+    const key = state.modeKeys[mode].toUpperCase();
+    const icon = mode === 'days' ? '📅' : mode === 'months' ? '📆' : mode === 'alphabet' ? '🔤' : '🔷';
+    return `<div class="active-key-item" data-mode="${mode}">${icon} <kbd>${key}</kbd></div>`;
+  }).join('');
+}
+
+function showFeedback(text, type) {
+  if (!state.feedbackEnabled) return;
+  els.feedback.textContent = text;
+  els.feedback.className = `feedback show ${type}`;
+  setTimeout(() => els.feedback.classList.remove('show'), 800);
+}
+
+function flashStimulus(cls) {
+  if (!state.feedbackEnabled) return;
+  els.stimulus.classList.add(cls);
+  setTimeout(() => els.stimulus.classList.remove(cls), 300);
+}
+
+function updateCombo() {
+  if (state.currentStreak >= 3) { els.comboValue.textContent = state.currentStreak; els.comboDisplay.classList.add('show'); }
+  else els.comboDisplay.classList.remove('show');
+}
+
+// ============ VFX ============
+function triggerCorrectVFX() {
+  if (!state.feedbackEnabled) return;
+  const r = els.stimulus.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  vfx.burst(cx, cy, '#10b981', 40); vfx.burst(cx, cy, '#8b5cf6', 25); vfx.burst(cx, cy, '#fbbf24', 15);
+  vfx.ringBurst(cx, cy, '#10b981'); vfx.ringBurst(cx, cy, '#8b5cf6');
+  flashStimulus('target-flash');
+  els.stimulus.classList.add('pulse'); setTimeout(() => els.stimulus.classList.remove('pulse'), 400);
+}
+function triggerWrongVFX() {
+  if (!state.feedbackEnabled) return;
+  const r = els.stimulus.getBoundingClientRect();
+  vfx.burst(r.left + r.width / 2, r.top + r.height / 2, '#ef4444', 20);
+  flashStimulus('miss-flash');
+}
+function triggerMissVFX() {
+  if (!state.feedbackEnabled) return;
+  const r = els.stimulus.getBoundingClientRect();
+  vfx.burst(r.left + r.width / 2, r.top + r.height / 2, '#f59e0b', 15);
+  flashStimulus('miss-flash');
+}
+
+// ============ SETTINGS PERSISTENCE ============
+function saveSettings() {
+  const settings = {
+    nLevel: state.nLevel,
+    stimulusDuration: state.stimulusDuration,
+    isiDuration: state.isiDuration,
+    blocksPerSession: state.blocksPerSession,
+    targetsPerBlock: state.targetsPerBlock,
+    activeModes: state.activeModes,
+    modeKeys: state.modeKeys,
+    feedbackEnabled: state.feedbackEnabled,
+    soundEnabled: audio.enabled
+  };
+  try { localStorage.setItem('executiveNBack_settings', JSON.stringify(settings)); } catch (e) {}
+}
+
+function loadSettings() {
+  try {
+    const saved = localStorage.getItem('executiveNBack_settings');
+    if (!saved) return;
+    const s = JSON.parse(saved);
+    if (s.nLevel) state.nLevel = s.nLevel;
+    if (s.stimulusDuration) state.stimulusDuration = s.stimulusDuration;
+    if (s.isiDuration) state.isiDuration = s.isiDuration;
+    if (s.blocksPerSession) state.blocksPerSession = s.blocksPerSession;
+    if (s.targetsPerBlock) state.targetsPerBlock = s.targetsPerBlock;
+    if (s.activeModes && s.activeModes.length > 0) state.activeModes = s.activeModes;
+    if (s.modeKeys) state.modeKeys = { ...state.modeKeys, ...s.modeKeys };
+    if (s.feedbackEnabled !== undefined) state.feedbackEnabled = s.feedbackEnabled;
+    if (s.soundEnabled !== undefined) audio.enabled = s.soundEnabled;
+  } catch (e) {}
+}
+
+function applySettingsToUI() {
+  els.nLevel.value = state.nLevel;
+  els.nValue.textContent = `${state.nLevel}-Back`;
+  els.stimulusDuration.value = state.stimulusDuration;
+  els.durationValue.textContent = `${state.stimulusDuration}ms`;
+  els.isiDuration.value = state.isiDuration;
+  els.isiValue.textContent = `${state.isiDuration}ms`;
+  els.blocksPerSession.value = state.blocksPerSession;
+  els.blocksValue.textContent = state.blocksPerSession;
+  els.targetsPerBlock.value = state.targetsPerBlock;
+  els.targetsValue.textContent = state.targetsPerBlock;
+  els.feedbackToggleSetting.classList.toggle('active', state.feedbackEnabled);
+  els.soundToggleSetting.classList.toggle('active', audio.enabled);
+  els.soundToggle.textContent = audio.enabled ? '🔊' : '🔇';
+  els.soundSettingGroup.style.opacity = state.feedbackEnabled ? '1' : '0.4';
+  els.soundSettingGroup.style.pointerEvents = state.feedbackEnabled ? 'auto' : 'none';
+
+  document.querySelectorAll('.mode-item').forEach(item => {
+    const mode = item.dataset.mode;
+    const isActive = state.activeModes.includes(mode);
+    item.classList.toggle('active', isActive);
+    const keyBtn = item.querySelector('.mode-key');
+    if (keyBtn) keyBtn.textContent = (state.modeKeys[mode] || '').toUpperCase();
+  });
+}
+
+// ============ GAME FLOW ============
+function startSession() {
+  audio.init(); audio.playStart();
+  state.isRunning = true; state.isPaused = false;
+  state.blockNumber = 0; state.totalScore = 0; state.totalTrials = 0; state.totalCorrect = 0;
+  state.blockScores = []; state.currentStreak = 0; state.bestStreak = 0;
+  state.sessionStartTime = Date.now();
+  els.mainMenu.classList.add('hidden'); els.summaryCard.classList.add('hidden');
+  els.gameArea.classList.remove('hidden');
+  els.pauseBtn.classList.remove('hidden'); els.quitBtn.classList.remove('hidden');
+  els.pauseBtn.textContent = 'Pause';
+  updateRuleInfo(); updateStats(); updateActiveKeysDisplay();
+  nextBlock();
+}
+
+function nextBlock() {
+  state.blockNumber++;
+  if (state.blockNumber > state.blocksPerSession) { endSession(); return; }
+  state.sequence = generateSequence(state.nLevel, state.targetsPerBlock);
+  state.currentIndex = 0; state.scoredCount = 0; state.blockScore = 0;
+  updateStats(); updateRuleInfo();
+  showFeedback(`Block ${state.blockNumber} — ${state.nLevel}-Back`, 'correct');
+  setTimeout(() => { if (state.isRunning && !state.isPaused) presentNext(); }, 1200);
+}
+
+function presentNext() {
+  if (!state.isRunning || state.isPaused) return;
+  if (state.currentIndex >= state.sequence.length) { endBlock(); return; }
+  const item = state.sequence[state.currentIndex];
+  state.currentMode = getModeForItem(item);
+  const isWarmUp = state.currentIndex < state.nLevel;
+  state.isTarget = !isWarmUp && isCurrentTarget(state.sequence, state.currentIndex, state.nLevel);
+  state.responded = false; state.canRespond = true;
+  renderStimulus(item);
+  els.stimulus.classList.add('active');
+  updateProgressRing(state.currentIndex / state.sequence.length);
+  state.timer = setTimeout(() => {
+    els.stimulus.classList.remove('active');
+    state.canRespond = false;
+    if (state.isTarget && !state.responded) {
+      state.totalTrials++; state.currentStreak = 0; updateCombo();
+      showFeedback('Missed!', 'miss'); triggerMissVFX(); audio.playMiss(); updateStats();
+    }
+    state.isiTimer = setTimeout(() => {
+      state.currentIndex++;
+      if (state.currentIndex >= state.nLevel) state.scoredCount++;
+      updateStats(); presentNext();
+    }, state.isiDuration);
+  }, state.stimulusDuration);
+}
+
+function handleResponse(mode) {
+  if (!state.isRunning || !state.canRespond || state.responded || state.isPaused) return;
+  if (mode !== state.currentMode) return;
+  state.responded = true;
+  if (state.isTarget) {
+    state.blockScore++; state.totalScore++; state.totalTrials++; state.totalCorrect++;
+    state.currentStreak++; if (state.currentStreak > state.bestStreak) state.bestStreak = state.currentStreak;
+    showFeedback('Correct!', 'correct'); triggerCorrectVFX(); audio.playCorrect(); updateCombo();
+  } else {
+    state.totalTrials++; state.currentStreak = 0;
+    showFeedback('False alarm!', 'wrong'); triggerWrongVFX(); audio.playWrong(); updateCombo();
+  }
+  updateStats();
+}
+
+function endBlock() {
+  state.blockScores.push(state.blockScore);
+  audio.playBlockComplete();
+  // Study adaptive protocol: 19-20 correct → N+1, 16-18 → stays, 0-15 → N-1 (min 1)
+  let newN = state.nLevel;
+  if (state.blockScore >= 19) newN = state.nLevel + 1;
+  else if (state.blockScore <= 15) newN = Math.max(1, state.nLevel - 1);
+  if (newN !== state.nLevel) { state.nLevel = newN; showFeedback(`N adjusted to ${newN}-Back`, 'correct'); }
+  updateStats();
+  setTimeout(() => { if (state.isRunning) nextBlock(); }, 1500);
+}
+
+function endSession() {
+  state.isRunning = false;
+  clearTimeout(state.timer); clearTimeout(state.isiTimer);
+  const duration = Date.now() - state.sessionStartTime;
+  const finalAcc = state.totalTrials > 0 ? Math.round((state.totalCorrect / state.totalTrials) * 100) : 0;
+  telemetry.recordSession({
+    blocksCompleted: state.blockNumber - 1, totalTrials: state.totalTrials,
+    totalCorrect: state.totalCorrect, finalN: state.nLevel, bestStreak: state.bestStreak,
+    blockScores: state.blockScores, durationMs: duration, modes: [...state.activeModes]
+  });
+  els.gameArea.classList.add('hidden'); els.summaryCard.classList.remove('hidden');
+  els.pauseBtn.classList.add('hidden'); els.quitBtn.classList.add('hidden');
+  els.finalN.textContent = state.nLevel; els.finalScore.textContent = state.totalScore; els.finalAccuracy.textContent = `${finalAcc}%`;
+  audio.playSessionComplete(); refreshTelemetry();
+}
+
+function togglePause() {
+  if (!state.isRunning) return;
+  state.isPaused = !state.isPaused;
+  if (state.isPaused) { clearTimeout(state.timer); clearTimeout(state.isiTimer); els.stimulus.classList.remove('active'); els.pauseBtn.textContent = 'Resume'; }
+  else { els.pauseBtn.textContent = 'Pause'; presentNext(); }
+}
+
+function quitToMenu() {
+  state.isRunning = false; state.isPaused = false;
+  clearTimeout(state.timer); clearTimeout(state.isiTimer);
+  els.gameArea.classList.add('hidden'); els.summaryCard.classList.add('hidden');
+  els.mainMenu.classList.remove('hidden');
+  els.pauseBtn.classList.add('hidden'); els.quitBtn.classList.add('hidden');
+  refreshTelemetry();
+}
+
+// ============ TELEMETRY UI ============
+function refreshTelemetry() {
+  const s = telemetry.getStats();
+  els.telSessions.textContent = s.sessions; els.telBlocks.textContent = s.blocks;
+  els.telAccuracy.textContent = s.sessions > 0 ? `${s.accuracy}%` : '--';
+  els.telBestN.textContent = s.bestN > 0 ? s.bestN : '--';
+  els.telStreak.textContent = s.bestStreak; els.telTime.textContent = `${s.time}m`;
+  const scores = telemetry.getRecentScores();
+  if (scores.length > 0) {
+    const max = Math.max(...scores, 20);
+    els.performanceChart.innerHTML = scores.map(s => `<div class="chart-bar" style="height:${Math.max(4, (s / max) * 100)}%" data-value="${s}"></div>`).join('');
+  }
+  const history = telemetry.getSessionHistory();
+  if (history.length > 0) {
+    els.historyList.innerHTML = `<table class="history-table"><thead><tr><th>Date</th><th>N</th><th>Score</th><th>Acc</th><th>Streak</th></tr></thead><tbody>${history.map(s => { const d = new Date(s.date); const a = s.totalTrials > 0 ? Math.round((s.totalCorrect / s.totalTrials) * 100) : 0; return `<tr><td>${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td><td>${s.finalN}</td><td class="${a>=70?'good':a<50?'bad':''}">${s.totalCorrect}/${s.totalTrials}</td><td>${a}%</td><td>${s.bestStreak}</td></tr>`; }).join('')}</tbody></table>`;
+  }
+}
+
+// ============ TABS ============
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ============ SETTINGS EVENTS ============
+els.nLevel.addEventListener('input', e => { state.nLevel = parseInt(e.target.value); els.nValue.textContent = `${state.nLevel}-Back`; updateRuleInfo(); saveSettings(); });
+els.stimulusDuration.addEventListener('input', e => { state.stimulusDuration = parseInt(e.target.value); els.durationValue.textContent = `${state.stimulusDuration}ms`; saveSettings(); });
+els.isiDuration.addEventListener('input', e => { state.isiDuration = parseInt(e.target.value); els.isiValue.textContent = `${state.isiDuration}ms`; saveSettings(); });
+els.blocksPerSession.addEventListener('input', e => { state.blocksPerSession = parseInt(e.target.value); els.blocksValue.textContent = state.blocksPerSession; saveSettings(); });
+els.targetsPerBlock.addEventListener('input', e => { state.targetsPerBlock = parseInt(e.target.value); els.targetsValue.textContent = state.targetsPerBlock; saveSettings(); });
+els.feedbackToggleSetting.addEventListener('click', () => {
+  state.feedbackEnabled = !state.feedbackEnabled;
+  els.feedbackToggleSetting.classList.toggle('active', state.feedbackEnabled);
+  // Show/hide sound setting based on feedback toggle
+  els.soundSettingGroup.style.opacity = state.feedbackEnabled ? '1' : '0.4';
+  els.soundSettingGroup.style.pointerEvents = state.feedbackEnabled ? 'auto' : 'none';
+  saveSettings();
+});
+els.soundToggleSetting.addEventListener('click', () => { audio.enabled = !audio.enabled; els.soundToggleSetting.classList.toggle('active', audio.enabled); els.soundToggle.textContent = audio.enabled ? '🔊' : '🔇'; saveSettings(); });
+els.soundToggle.addEventListener('click', () => { audio.enabled = !audio.enabled; els.soundToggle.textContent = audio.enabled ? '🔊' : '🔇'; els.soundToggleSetting.classList.toggle('active', audio.enabled); saveSettings(); });
+
+// Mode selection
+document.querySelectorAll('.mode-item').forEach(item => {
+  item.addEventListener('click', e => {
+    if (e.target.classList.contains('mode-key')) return;
+    const mode = item.dataset.mode;
+    if (item.classList.contains('active')) {
+      if (state.activeModes.length <= 1) return;
+      item.classList.remove('active');
+      state.activeModes = state.activeModes.filter(m => m !== mode);
+    } else {
+      item.classList.add('active');
+      state.activeModes.push(mode);
+    }
+    updateRuleInfo();
+    saveSettings();
+  });
+});
+
+// Per-mode key binding
+let listeningForKey = null;
+document.querySelectorAll('.mode-key').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    listeningForKey = btn.dataset.mode;
+    btn.textContent = '...';
+    btn.classList.add('listening');
+  });
+});
+
+document.addEventListener('keydown', e => {
+  if (listeningForKey) {
+    e.preventDefault();
+    state.modeKeys[listeningForKey] = e.key.toLowerCase();
+    const btn = document.querySelector(`.mode-key[data-mode="${listeningForKey}"]`);
+    if (btn) { btn.textContent = e.key.toUpperCase(); btn.classList.remove('listening'); }
+    listeningForKey = null;
+    saveSettings();
+    return;
+  }
+  if (state.isRunning && !state.isPaused) {
+    const mode = Object.keys(state.modeKeys).find(m => state.modeKeys[m] === e.key.toLowerCase());
+    if (mode && state.activeModes.includes(mode)) {
+      e.preventDefault();
+      flashKeyPress(mode);
+      handleResponse(mode);
+    }
+  }
+  if (e.key === ' ' && state.isRunning) { e.preventDefault(); togglePause(); }
+  if (e.key === 'Escape' && state.isRunning) quitToMenu();
+});
+
+function flashKeyPress(mode) {
+  const item = els.activeKeys.querySelector(`[data-mode="${mode}"] kbd`);
+  if (item) {
+    item.classList.add('pressed');
+    setTimeout(() => item.classList.remove('pressed'), 200);
+  }
+}
+
+els.startBtn.addEventListener('click', startSession);
+els.pauseBtn.addEventListener('click', togglePause);
+els.quitBtn.addEventListener('click', quitToMenu);
+els.restartBtn.addEventListener('click', startSession);
+els.menuBtn.addEventListener('click', quitToMenu);
+
+// ============ INIT ============
+loadSettings();
+applySettingsToUI();
+updateRuleInfo(); updateStats(); refreshTelemetry();
+</script>
+</body>
+</html>
