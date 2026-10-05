@@ -481,7 +481,14 @@ body::before {
           <div class="range-value" id="targetsValue">6</div>
         </div>
         <div class="setting-group">
-          <label>🔊 Sound Effects <span class="info-icon">i<span class="info-tooltip">Play audio feedback for correct answers, false alarms, and misses.</span></span></label>
+          <label>💬 Feedback <span class="info-icon">i<span class="info-tooltip">Show visual feedback for correct answers, false alarms, and misses. Disable to remove all feedback including sound.</span></span></label>
+          <div class="toggle-group">
+            <span style="font-size:0.8rem;color:var(--text-muted)">Enabled</span>
+            <div class="toggle active" id="feedbackToggleSetting"></div>
+          </div>
+        </div>
+        <div class="setting-group" id="soundSettingGroup">
+          <label>🔊 Sound Effects <span class="info-icon">i<span class="info-tooltip">Play audio feedback for correct answers, false alarms, and misses. Only available when feedback is enabled.</span></span></label>
           <div class="toggle-group">
             <span style="font-size:0.8rem;color:var(--text-muted)">Enabled</span>
             <div class="toggle active" id="soundToggleSetting"></div>
@@ -757,7 +764,7 @@ class AudioEngine {
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); this.initialized = true; } catch (e) {}
   }
   playTone(freq, duration, type = 'sine', volume = 0.15, delay = 0) {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled || !state.feedbackEnabled || !this.ctx) return;
     if (this.ctx.state === 'suspended') this.ctx.resume();
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -863,6 +870,7 @@ const state = {
   blocksPerSession: 20, targetsPerBlock: 6,
   activeModes: ['days', 'months', 'alphabet', 'shapes'],
   modeKeys: { days: 'j', months: 'k', alphabet: 'l', shapes: ';' },
+  feedbackEnabled: true,
   isRunning: false, isPaused: false, blockNumber: 0, sessionStartTime: 0,
   sequence: [], currentIndex: 0, scoredCount: 0, blockScore: 0,
   totalScore: 0, totalTrials: 0, totalCorrect: 0, blockScores: [],
@@ -877,7 +885,9 @@ const els = {
   isiDuration: document.getElementById('isiDuration'), isiValue: document.getElementById('isiValue'),
   blocksPerSession: document.getElementById('blocksPerSession'), blocksValue: document.getElementById('blocksValue'),
   targetsPerBlock: document.getElementById('targetsPerBlock'), targetsValue: document.getElementById('targetsValue'),
+  feedbackToggleSetting: document.getElementById('feedbackToggleSetting'),
   soundToggleSetting: document.getElementById('soundToggleSetting'),
+  soundSettingGroup: document.getElementById('soundSettingGroup'),
   blockNum: document.getElementById('blockNum'), trialNum: document.getElementById('trialNum'),
   score: document.getElementById('score'), accuracy: document.getElementById('accuracy'), streak: document.getElementById('streak'),
   stimulus: document.getElementById('stimulus'), feedback: document.getElementById('feedback'),
@@ -995,12 +1005,17 @@ function updateActiveKeysDisplay() {
 }
 
 function showFeedback(text, type) {
+  if (!state.feedbackEnabled) return;
   els.feedback.textContent = text;
   els.feedback.className = `feedback show ${type}`;
   setTimeout(() => els.feedback.classList.remove('show'), 800);
 }
 
-function flashStimulus(cls) { els.stimulus.classList.add(cls); setTimeout(() => els.stimulus.classList.remove(cls), 300); }
+function flashStimulus(cls) {
+  if (!state.feedbackEnabled) return;
+  els.stimulus.classList.add(cls);
+  setTimeout(() => els.stimulus.classList.remove(cls), 300);
+}
 
 function updateCombo() {
   if (state.currentStreak >= 3) { els.comboValue.textContent = state.currentStreak; els.comboDisplay.classList.add('show'); }
@@ -1009,6 +1024,7 @@ function updateCombo() {
 
 // ============ VFX ============
 function triggerCorrectVFX() {
+  if (!state.feedbackEnabled) return;
   const r = els.stimulus.getBoundingClientRect();
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
   vfx.burst(cx, cy, '#10b981', 40); vfx.burst(cx, cy, '#8b5cf6', 25); vfx.burst(cx, cy, '#fbbf24', 15);
@@ -1017,11 +1033,13 @@ function triggerCorrectVFX() {
   els.stimulus.classList.add('pulse'); setTimeout(() => els.stimulus.classList.remove('pulse'), 400);
 }
 function triggerWrongVFX() {
+  if (!state.feedbackEnabled) return;
   const r = els.stimulus.getBoundingClientRect();
   vfx.burst(r.left + r.width / 2, r.top + r.height / 2, '#ef4444', 20);
   flashStimulus('miss-flash');
 }
 function triggerMissVFX() {
+  if (!state.feedbackEnabled) return;
   const r = els.stimulus.getBoundingClientRect();
   vfx.burst(r.left + r.width / 2, r.top + r.height / 2, '#f59e0b', 15);
   flashStimulus('miss-flash');
@@ -1037,6 +1055,7 @@ function saveSettings() {
     targetsPerBlock: state.targetsPerBlock,
     activeModes: state.activeModes,
     modeKeys: state.modeKeys,
+    feedbackEnabled: state.feedbackEnabled,
     soundEnabled: audio.enabled
   };
   try { localStorage.setItem('executiveNBack_settings', JSON.stringify(settings)); } catch (e) {}
@@ -1054,6 +1073,7 @@ function loadSettings() {
     if (s.targetsPerBlock) state.targetsPerBlock = s.targetsPerBlock;
     if (s.activeModes && s.activeModes.length > 0) state.activeModes = s.activeModes;
     if (s.modeKeys) state.modeKeys = { ...state.modeKeys, ...s.modeKeys };
+    if (s.feedbackEnabled !== undefined) state.feedbackEnabled = s.feedbackEnabled;
     if (s.soundEnabled !== undefined) audio.enabled = s.soundEnabled;
   } catch (e) {}
 }
@@ -1069,8 +1089,11 @@ function applySettingsToUI() {
   els.blocksValue.textContent = state.blocksPerSession;
   els.targetsPerBlock.value = state.targetsPerBlock;
   els.targetsValue.textContent = state.targetsPerBlock;
+  els.feedbackToggleSetting.classList.toggle('active', state.feedbackEnabled);
   els.soundToggleSetting.classList.toggle('active', audio.enabled);
   els.soundToggle.textContent = audio.enabled ? '🔊' : '🔇';
+  els.soundSettingGroup.style.opacity = state.feedbackEnabled ? '1' : '0.4';
+  els.soundSettingGroup.style.pointerEvents = state.feedbackEnabled ? 'auto' : 'none';
 
   document.querySelectorAll('.mode-item').forEach(item => {
     const mode = item.dataset.mode;
@@ -1225,6 +1248,14 @@ els.stimulusDuration.addEventListener('input', e => { state.stimulusDuration = p
 els.isiDuration.addEventListener('input', e => { state.isiDuration = parseInt(e.target.value); els.isiValue.textContent = `${state.isiDuration}ms`; saveSettings(); });
 els.blocksPerSession.addEventListener('input', e => { state.blocksPerSession = parseInt(e.target.value); els.blocksValue.textContent = state.blocksPerSession; saveSettings(); });
 els.targetsPerBlock.addEventListener('input', e => { state.targetsPerBlock = parseInt(e.target.value); els.targetsValue.textContent = state.targetsPerBlock; saveSettings(); });
+els.feedbackToggleSetting.addEventListener('click', () => {
+  state.feedbackEnabled = !state.feedbackEnabled;
+  els.feedbackToggleSetting.classList.toggle('active', state.feedbackEnabled);
+  // Show/hide sound setting based on feedback toggle
+  els.soundSettingGroup.style.opacity = state.feedbackEnabled ? '1' : '0.4';
+  els.soundSettingGroup.style.pointerEvents = state.feedbackEnabled ? 'auto' : 'none';
+  saveSettings();
+});
 els.soundToggleSetting.addEventListener('click', () => { audio.enabled = !audio.enabled; els.soundToggleSetting.classList.toggle('active', audio.enabled); els.soundToggle.textContent = audio.enabled ? '🔊' : '🔇'; saveSettings(); });
 els.soundToggle.addEventListener('click', () => { audio.enabled = !audio.enabled; els.soundToggle.textContent = audio.enabled ? '🔊' : '🔇'; els.soundToggleSetting.classList.toggle('active', audio.enabled); saveSettings(); });
 
