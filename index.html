@@ -481,6 +481,17 @@ body[data-theme="sunset"]::before {
   text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap;
 }
 
+/* Response-period visual (fixation cross / selected stimulus) */
+.response-visual {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  display: none; align-items: center; justify-content: center;
+  color: var(--text-primary); z-index: 4; pointer-events: none;
+}
+.response-visual.active { display: flex; animation: respFadeIn 0.18s ease; }
+.response-visual svg { width: 72px; height: 72px; filter: drop-shadow(0 0 10px var(--accent-glow)); }
+.response-visual img { max-width: 150px; max-height: 150px; object-fit: contain; border-radius: 8px; }
+@keyframes respFadeIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+
 /* Progress ring */
 .progress-ring { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 .progress-ring circle { fill: none; stroke-width: 3; }
@@ -679,9 +690,22 @@ body[data-theme="sunset"]::before {
           <div class="range-value" id="durationValue">1500ms</div>
         </div>
         <div class="setting-group">
-          <label>⏸️ Inter-Stimulus Interval <span class="info-icon">i<span class="info-tooltip">The blank pause between stimuli. This is your processing time.</span></span></label>
-          <input type="range" id="isiDuration" min="100" max="3000" step="50" value="500">
-          <div class="range-value" id="isiValue">500ms</div>
+          <label>⏸️ Inter-Stimulus Interval <span class="info-icon">i<span class="info-tooltip">How long the response symbol (fixation cross) remains visible at the center of the screen after each stimulus. The symbol stays on screen for exactly this duration, then disappears instantly as the next trial begins. Default: 2,500 ms.</span></span></label>
+          <input type="range" id="isiDuration" min="100" max="25000" step="100" value="2500">
+          <div class="range-value" id="isiValue">2500ms</div>
+        </div>
+        <div class="setting-group">
+          <label>➕ Response Period Visual <span class="info-icon">i<span class="info-tooltip">What is displayed at the center of the screen while the response symbol is visible (i.e., for exactly the duration of the Inter-Stimulus Interval after each stimulus). The original study used a fixation cross. Pick "Custom image" to supply your own image URL — the choice persists for the whole session.</span></span></label>
+          <select id="responseVisual">
+            <option value="cross">Fixation cross (+)</option>
+            <option value="dot">Filled dot (•)</option>
+            <option value="ring">Ring (○)</option>
+            <option value="star">Star (★)</option>
+            <option value="diamond">Diamond (◆)</option>
+            <option value="blank">Blank screen</option>
+            <option value="custom">Custom image…</option>
+          </select>
+          <input type="text" id="responseImageURL" placeholder="Paste image URL…" style="display:none">
         </div>
         <div class="setting-group">
           <label>📊 Blocks per Session <span class="info-icon">i<span class="info-tooltip">How many blocks (rounds) make up one full session. The original study used 20 blocks.</span></span></label>
@@ -818,7 +842,7 @@ body[data-theme="sunset"]::before {
           <li><strong>16–18 correct</strong> → N stays the same</li>
           <li><strong>0–15 correct</strong> → N decreases by 1 (minimum 1)</li>
         </ul>
-        <p>Each block contains <strong>N warm-up stimuli</strong> (not scored) followed by <strong>20 scored decisions</strong> with exactly <strong>6 targets</strong> and 14 non-targets. Correctly withholding a response on a non-target counts as correct.</p>
+        <p>Each block contains exactly <strong>20 + N trials</strong>: <strong>N warm-up stimuli</strong> (not scored) followed by <strong>20 scored decisions</strong> with exactly <strong>6 targets</strong> and 14 non-targets. Correctly withholding a response on a non-target counts as correct. After each stimulus, a fixation cross (or your chosen visual) appears at the center of the screen and remains visible for exactly the configured <strong>inter-stimulus interval</strong> (default 2,500 ms) before disappearing as the next trial begins — you may still respond while it is visible.</p>
         <p>Sessions consisted of <strong>20 blocks</strong>. The first session began at 1-back, and subsequent sessions started at the previous session's final N minus 2.</p>
 
         <h3>📊 What the Research Concludes</h3>
@@ -896,6 +920,7 @@ body[data-theme="sunset"]::before {
         <circle class="fg" cx="110" cy="110" r="100" id="progressCircle" stroke-dasharray="628.32" stroke-dashoffset="628.32" transform="rotate(-90 110 110)"></circle>
       </svg>
       <div class="stimulus" id="stimulus">?</div>
+      <div class="response-visual" id="responseVisualDisplay"></div>
     </div>
 
     <div class="feedback" id="feedback"></div>
@@ -1034,11 +1059,13 @@ class VFXEngine {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.particles = this.particles.filter(p => p.life > 0);
     for (const p of this.particles) {
-      p.life -= p.decay; p.x += p.vx; p.y += p.vy; p.vx *= 0.98; p.vy *= 0.98;
+      p.life -= p.decay;
+      if (p.life <= 0) continue; // Never draw with a non-positive life (negative radius throws)
+      p.x += p.vx; p.y += p.vy; p.vx *= 0.98; p.vy *= 0.98;
       this.ctx.globalAlpha = p.life;
-      if (p.type === 'circle') { this.ctx.beginPath(); this.ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); this.ctx.fillStyle = p.color; this.ctx.fill(); }
-      else if (p.type === 'star') this.drawStar(p.x, p.y, p.size * p.life, p.color);
-      else if (p.type === 'ring') { p.radius += (p.maxRadius - p.radius) * 0.1; this.ctx.beginPath(); this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); this.ctx.strokeStyle = p.color; this.ctx.lineWidth = 2 * p.life; this.ctx.stroke(); }
+      if (p.type === 'circle') { this.ctx.beginPath(); this.ctx.arc(p.x, p.y, Math.max(0.1, p.size * p.life), 0, Math.PI * 2); this.ctx.fillStyle = p.color; this.ctx.fill(); }
+      else if (p.type === 'star') this.drawStar(p.x, p.y, Math.max(0.1, p.size * p.life), p.color);
+      else if (p.type === 'ring') { p.radius += (p.maxRadius - p.radius) * 0.1; this.ctx.beginPath(); this.ctx.arc(p.x, p.y, Math.max(0.1, p.radius), 0, Math.PI * 2); this.ctx.strokeStyle = p.color; this.ctx.lineWidth = Math.max(0.1, 2 * p.life); this.ctx.stroke(); }
     }
     this.ctx.globalAlpha = 1;
     requestAnimationFrame(() => this.animate());
@@ -1083,7 +1110,8 @@ const telemetry = new Telemetry();
 
 // ============ GAME STATE ============
 const state = {
-  nLevel: 2, stimulusDuration: 1500, isiDuration: 500,
+  nLevel: 2, stimulusDuration: 1500, isiDuration: 2500,
+  responseVisual: 'cross', responseImageURL: '',
   blocksPerSession: 20, targetsPerBlock: 6,
   activeModes: ['days', 'months', 'alphabet', 'shapes'],
   modeKeys: { days: 'j', months: 'k', alphabet: 'l', shapes: ';' },
@@ -1095,7 +1123,7 @@ const state = {
   blockTargetsSeen: 0,
   totalScore: 0, totalTrials: 0, totalCorrect: 0, blockScores: [],
   bestStreak: 0, currentStreak: 0,
-  timer: null, isiTimer: null, canRespond: false, responded: false, isTarget: false, currentMode: null
+  timer: null, isiTimer: null, respTimer: null, canRespond: false, responded: false, isTarget: false, currentMode: null
 };
 
 // ============ DOM ELEMENTS ============
@@ -1103,8 +1131,10 @@ const els = {
   nLevel: document.getElementById('nLevel'), nValue: document.getElementById('nValue'),
   stimulusDuration: document.getElementById('stimulusDuration'), durationValue: document.getElementById('durationValue'),
   isiDuration: document.getElementById('isiDuration'), isiValue: document.getElementById('isiValue'),
+  responseVisualDisplay: document.getElementById('responseVisualDisplay'),
+  responseVisualSelect: document.getElementById('responseVisual'),
+  responseImageURL: document.getElementById('responseImageURL'),
   blocksPerSession: document.getElementById('blocksPerSession'), blocksValue: document.getElementById('blocksValue'),
-  targetsPerBlock: document.getElementById('targetsPerBlock'), targetsValue: document.getElementById('targetsValue'),
   themeSelect: document.getElementById('themeSelect'),
   feedbackToggleSetting: document.getElementById('feedbackToggleSetting'),
   soundToggleSetting: document.getElementById('soundToggleSetting'),
@@ -1172,70 +1202,40 @@ function generateSequence(n, targetCount) {
   const items = getAllItems();
   const totalLength = n + 20;
   const scoredStart = n, scoredEnd = totalLength;
+  const sameItem = (a, b) => (a && typeof a === 'object') ? a.name === b.name : a === b;
 
-  // Build sequence with exactly targetCount targets using deterministic placement
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const sequence = [];
-    for (let i = 0; i < totalLength; i++) {
-      sequence.push(items[Math.floor(Math.random() * items.length)]);
-    }
-
-    // Fix targets: first remove excess targets, then add missing ones
-    let currentTargets = 0;
-    for (let i = scoredStart; i < scoredEnd; i++) {
-      if (isCurrentTarget(sequence, i, n)) currentTargets++;
-    }
-
-    // Remove excess targets
-    let guard = 0;
-    while (currentTargets > targetCount && guard < 500) {
-      const targetPositions = [];
-      for (let i = scoredStart; i < scoredEnd; i++) {
-        if (isCurrentTarget(sequence, i, n)) targetPositions.push(i);
-      }
-      if (targetPositions.length === 0) break;
-      const idx = targetPositions[Math.floor(Math.random() * targetPositions.length)];
-      const nextItem = getNextItem(sequence[idx - n]);
-      let randomItem;
-      do {
-        randomItem = items[Math.floor(Math.random() * items.length)];
-      } while (randomItem === nextItem);
-      sequence[idx] = randomItem;
-      currentTargets--;
-      guard++;
-    }
-
-    // Add missing targets
-    guard = 0;
-    while (currentTargets < targetCount && guard < 500) {
-      const nonTargetPositions = [];
-      for (let i = scoredStart; i < scoredEnd; i++) {
-        if (!isCurrentTarget(sequence, i, n)) nonTargetPositions.push(i);
-      }
-      if (nonTargetPositions.length === 0) break;
-      const idx = nonTargetPositions[Math.floor(Math.random() * nonTargetPositions.length)];
-      sequence[idx] = getNextItem(sequence[idx - n]);
-      currentTargets++;
-      guard++;
-    }
-
-    if (currentTargets === targetCount) return sequence;
+  // Pick exactly targetCount distinct positions inside the scored window [n, n+20)
+  const pool = [];
+  for (let i = scoredStart; i < scoredEnd; i++) pool.push(i);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
   }
+  const chosen = new Set(pool.slice(0, Math.min(targetCount, pool.length)));
 
-  // Ultimate fallback: construct sequence manually with exactly targetCount targets
+  // Single forward pass — every value is final once written:
+  //  * chosen position p  → set to the "next after N-back" item, creating a target at p
+  //  * any other position → must NOT equal nextItem(seq[p-n]), so no accidental targets,
+  //    which also prevents a chosen p from creating a stray target at p+n
   const sequence = [];
   for (let i = 0; i < totalLength; i++) {
-    sequence.push(items[Math.floor(Math.random() * items.length)]);
-  }
-  // Force exactly targetCount targets at fixed positions
-  const positions = [];
-  for (let i = 0; i < targetCount; i++) {
-    positions.push(n + Math.floor(i * 20 / targetCount));
-  }
-  for (const pos of positions) {
-    if (pos < totalLength) {
-      sequence[pos] = getNextItem(sequence[pos - n]);
+    if (chosen.has(i)) {
+      sequence.push(getNextItem(sequence[i - n]));
+      continue;
     }
+    let cand = null;
+    if (i >= scoredStart) {
+      const forbidden = getNextItem(sequence[i - n]);
+      for (let t = 0; t < 60 && cand === null; t++) {
+        const c = items[Math.floor(Math.random() * items.length)];
+        if (!sameItem(c, forbidden)) cand = c;
+      }
+      if (cand === null) {
+        for (const c of items) { if (!sameItem(c, forbidden)) { cand = c; break; } }
+      }
+    }
+    if (cand === null) cand = items[Math.floor(Math.random() * items.length)];
+    sequence.push(cand);
   }
   return sequence;
 }
@@ -1333,9 +1333,12 @@ function setTheme(theme) {
 // ============ SETTINGS PERSISTENCE ============
 function saveSettings() {
   const settings = {
+    v: 2,
     nLevel: state.nLevel,
     stimulusDuration: state.stimulusDuration,
     isiDuration: state.isiDuration,
+    responseVisual: state.responseVisual,
+    responseImageURL: state.responseImageURL,
     blocksPerSession: state.blocksPerSession,
     targetsPerBlock: state.targetsPerBlock,
     activeModes: state.activeModes,
@@ -1354,7 +1357,12 @@ function loadSettings() {
     const s = JSON.parse(saved);
     if (s.nLevel) state.nLevel = s.nLevel;
     if (s.stimulusDuration) state.stimulusDuration = s.stimulusDuration;
-    if (s.isiDuration) state.isiDuration = s.isiDuration;
+    // v2: the ISI now controls how long the response symbol stays visible —
+    // adopt the new 2,500 ms default when loading settings saved before that change
+    if (!s.v || s.v < 2) state.isiDuration = 2500;
+    else if (s.isiDuration) state.isiDuration = s.isiDuration;
+    if (s.responseVisual) state.responseVisual = s.responseVisual;
+    if (s.responseImageURL !== undefined) state.responseImageURL = s.responseImageURL;
     if (s.blocksPerSession) state.blocksPerSession = s.blocksPerSession;
     if (s.targetsPerBlock) state.targetsPerBlock = s.targetsPerBlock;
     if (s.activeModes && s.activeModes.length > 0) state.activeModes = s.activeModes;
@@ -1372,6 +1380,9 @@ function applySettingsToUI() {
   els.durationValue.textContent = `${state.stimulusDuration}ms`;
   els.isiDuration.value = state.isiDuration;
   els.isiValue.textContent = `${state.isiDuration}ms`;
+  els.responseVisualSelect.value = state.responseVisual;
+  els.responseImageURL.value = state.responseImageURL;
+  els.responseImageURL.style.display = state.responseVisual === 'custom' ? 'block' : 'none';
   els.blocksPerSession.value = state.blocksPerSession;
   els.blocksValue.textContent = state.blocksPerSession;
   // Targets per block is fixed at 6 — no UI sync needed
@@ -1413,10 +1424,37 @@ function nextBlock() {
   if (state.blockNumber > state.blocksPerSession) { endSession(); return; }
   state.sequence = generateSequence(state.nLevel, state.targetsPerBlock);
   state.currentIndex = 0; state.scoredCount = 0; state.blockScore = 0; state.blockCorrectRejections = 0;
-  state.blockTargetsSeen = 0; state.hasCorrect = false;
+  state.blockTargetsSeen = 0;
   updateStats(); updateRuleInfo();
   showFeedback(`Block ${state.blockNumber} — ${state.nLevel}-Back`, 'correct');
   setTimeout(() => { if (state.isRunning && !state.isPaused) presentNext(); }, 1200);
+}
+
+// ============ RESPONSE-PERIOD VISUAL ============
+const RESPONSE_VISUALS = {
+  cross: '<svg viewBox="0 0 100 100" aria-hidden="true"><line x1="50" y1="16" x2="50" y2="84" stroke="currentColor" stroke-width="9" stroke-linecap="round"/><line x1="16" y1="50" x2="84" y2="50" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></svg>',
+  dot: '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="13" fill="currentColor"/></svg>',
+  ring: '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="26" fill="none" stroke="currentColor" stroke-width="9"/></svg>',
+  star: '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 L61 40 L91 40 L67 58 L76 87 L50 69 L24 87 L33 58 L9 40 L39 40 Z" fill="currentColor"/></svg>',
+  diamond: '<svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,14 86,50 50,86 14,50" fill="currentColor"/></svg>',
+  blank: ''
+};
+
+function showResponseVisual() {
+  const v = state.responseVisual || 'cross';
+  if (v === 'custom') {
+    els.responseVisualDisplay.innerHTML = state.responseImageURL
+      ? `<img src="${state.responseImageURL.replace(/"/g, '&quot;')}" alt="" onerror="this.style.display='none'">`
+      : RESPONSE_VISUALS.cross;
+  } else {
+    els.responseVisualDisplay.innerHTML = RESPONSE_VISUALS[v] !== undefined ? RESPONSE_VISUALS[v] : RESPONSE_VISUALS.cross;
+  }
+  els.responseVisualDisplay.classList.add('active');
+}
+
+function hideResponseVisual() {
+  els.responseVisualDisplay.classList.remove('active');
+  els.responseVisualDisplay.innerHTML = '';
 }
 
 function presentNext() {
@@ -1430,32 +1468,39 @@ function presentNext() {
   state.responded = false; state.canRespond = true;
   renderStimulus(item);
   els.stimulus.classList.add('active');
+  hideResponseVisual();
   updateProgressRing(state.currentIndex / state.sequence.length);
+  // Phase 1 — stimulus presentation (responses accepted)
   state.timer = setTimeout(() => {
     els.stimulus.classList.remove('active');
-    state.canRespond = false;
-    // Only score trials after warm-up (from the 1st scored trial onward)
-    if (!isWarmUp) {
-      if (state.isTarget && !state.responded) {
-        // Missed match — incorrect
-        state.totalTrials++; state.currentStreak = 0; updateCombo();
-        showFeedback('Missed!', 'miss'); triggerMissVFX(); audio.playMiss(); updateStats();
-      } else if (!state.isTarget && !state.responded) {
-        // Correct non-match response — correct rejection
-        // Correct non-match response — correct rejection
-        state.blockCorrectRejections++;
-        state.totalTrials++; state.totalCorrect++;
-        state.blockScore++;
-        state.totalScore++;
-        state.currentStreak++; if (state.currentStreak > state.bestStreak) state.bestStreak = state.currentStreak;
-        updateCombo();
+    els.stimulus.innerHTML = ''; // Clear so only the response visual shows
+    // Phase 2 — response symbol visible for exactly the inter-stimulus interval
+    showResponseVisual();
+    state.respTimer = setTimeout(() => {
+      state.canRespond = false;
+      hideResponseVisual(); // Symbol disappears instantly when the ISI elapses
+      // Score the trial now that the response window has closed
+      if (!isWarmUp) {
+        if (state.isTarget && !state.responded) {
+          // Missed match — incorrect
+          state.totalTrials++; state.currentStreak = 0; updateCombo();
+          showFeedback('Missed!', 'miss'); triggerMissVFX(); audio.playMiss(); updateStats();
+        } else if (!state.isTarget && !state.responded) {
+          // Correct non-match response — correct rejection
+          state.blockCorrectRejections++;
+          state.totalTrials++; state.totalCorrect++;
+          state.blockScore++;
+          state.totalScore++;
+          state.currentStreak++; if (state.currentStreak > state.bestStreak) state.bestStreak = state.currentStreak;
+          updateCombo();
+        }
       }
-    }
-    state.isiTimer = setTimeout(() => {
+      // Next trial begins immediately as the symbol disappears
       state.currentIndex++;
       // Only count scored trials (within the 20-trial scored portion)
       if (state.currentIndex > state.nLevel && state.currentIndex <= state.nLevel + 20) state.scoredCount++;
-      updateStats(); presentNext();
+      updateStats();
+      presentNext();
     }, state.isiDuration);
   }, state.stimulusDuration);
 }
@@ -1502,7 +1547,7 @@ function endBlock() {
 
 function endSession() {
   state.isRunning = false;
-  clearTimeout(state.timer); clearTimeout(state.isiTimer);
+  clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer); hideResponseVisual();
   const duration = Date.now() - state.sessionStartTime;
   const finalAcc = state.totalTrials > 0 ? Math.round((state.totalCorrect / state.totalTrials) * 100) : 0;
   telemetry.recordSession({
@@ -1521,13 +1566,13 @@ function endSession() {
 function togglePause() {
   if (!state.isRunning) return;
   state.isPaused = !state.isPaused;
-  if (state.isPaused) { clearTimeout(state.timer); clearTimeout(state.isiTimer); els.stimulus.classList.remove('active'); els.pauseBtn.textContent = 'Resume'; }
+  if (state.isPaused) { clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer); els.stimulus.classList.remove('active'); hideResponseVisual(); els.pauseBtn.textContent = 'Resume'; }
   else { els.pauseBtn.textContent = 'Pause'; presentNext(); }
 }
 
 function quitToMenu() {
   state.isRunning = false; state.isPaused = false;
-  clearTimeout(state.timer); clearTimeout(state.isiTimer);
+  clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer); hideResponseVisual();
   // Session NOT completed — restore the N-level from before this session started
   state.nLevel = state.sessionStartN;
   saveSettings();
@@ -1570,6 +1615,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 els.nLevel.addEventListener('input', e => { state.nLevel = parseInt(e.target.value); els.nValue.textContent = `${state.nLevel}-Back`; updateRuleInfo(); saveSettings(); });
 els.stimulusDuration.addEventListener('input', e => { state.stimulusDuration = parseInt(e.target.value); els.durationValue.textContent = `${state.stimulusDuration}ms`; saveSettings(); });
 els.isiDuration.addEventListener('input', e => { state.isiDuration = parseInt(e.target.value); els.isiValue.textContent = `${state.isiDuration}ms`; saveSettings(); });
+els.responseVisualSelect.addEventListener('change', e => {
+  state.responseVisual = e.target.value;
+  els.responseImageURL.style.display = state.responseVisual === 'custom' ? 'block' : 'none';
+  saveSettings();
+});
+els.responseImageURL.addEventListener('input', e => { state.responseImageURL = e.target.value.trim(); saveSettings(); });
 els.blocksPerSession.addEventListener('input', e => { state.blocksPerSession = parseInt(e.target.value); els.blocksValue.textContent = state.blocksPerSession; saveSettings(); });
 // Targets per block is fixed at 6 — no event listener needed
 els.themeSelect.addEventListener('change', e => setTheme(e.target.value));
