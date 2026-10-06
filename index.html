@@ -1092,7 +1092,7 @@ const state = {
   theme: 'default',
   sessionStartN: 2,
   isRunning: false, isPaused: false, blockNumber: 0, sessionStartTime: 0,
-  sequence: [], currentIndex: 0, scoredCount: 0, blockScore: 0,
+  sequence: [], currentIndex: 0, scoredCount: 0, blockScore: 0, blockCorrectRejections: 0,
   totalScore: 0, totalTrials: 0, totalCorrect: 0, blockScores: [],
   bestStreak: 0, currentStreak: 0,
   timer: null, isiTimer: null, canRespond: false, responded: false, isTarget: false, currentMode: null
@@ -1364,7 +1364,7 @@ function nextBlock() {
   state.blockNumber++;
   if (state.blockNumber > state.blocksPerSession) { endSession(); return; }
   state.sequence = generateSequence(state.nLevel, state.targetsPerBlock);
-  state.currentIndex = 0; state.scoredCount = 0; state.blockScore = 0;
+  state.currentIndex = 0; state.scoredCount = 0; state.blockScore = 0; state.blockCorrectRejections = 0;
   updateStats(); updateRuleInfo();
   showFeedback(`Block ${state.blockNumber} — ${state.nLevel}-Back`, 'correct');
   setTimeout(() => { if (state.isRunning && !state.isPaused) presentNext(); }, 1200);
@@ -1385,8 +1385,17 @@ function presentNext() {
     els.stimulus.classList.remove('active');
     state.canRespond = false;
     if (state.isTarget && !state.responded) {
+      // Missed match — incorrect
       state.totalTrials++; state.currentStreak = 0; updateCombo();
       showFeedback('Missed!', 'miss'); triggerMissVFX(); audio.playMiss(); updateStats();
+    } else if (!state.isTarget && !state.responded) {
+      // Correct non-match response — correct rejection
+      state.blockCorrectRejections++;
+      state.totalTrials++; state.totalCorrect++;
+      state.blockScore++;
+      state.totalScore++;
+      state.currentStreak++; if (state.currentStreak > state.bestStreak) state.bestStreak = state.currentStreak;
+      updateCombo();
     }
     state.isiTimer = setTimeout(() => {
       state.currentIndex++;
