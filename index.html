@@ -690,8 +690,7 @@ body[data-theme="sunset"]::before {
         </div>
         <div class="setting-group">
           <label>🎯 Targets per Block <span class="info-icon">i<span class="info-tooltip">How many correct responses (targets) appear in each block. The original study used 6 targets out of 20 trials.</span></span></label>
-          <input type="range" id="targetsPerBlock" min="1" max="19" value="6">
-          <div class="range-value" id="targetsValue">6</div>
+          <div class="range-value" style="font-size:0.9rem">6 targets</div>
         </div>
         <div class="setting-group">
           <label>💬 Feedback <span class="info-icon">i<span class="info-tooltip">Show visual feedback for correct answers, false alarms, and misses. Disable to remove all feedback including sound.</span></span></label>
@@ -1093,6 +1092,7 @@ const state = {
   sessionStartN: 2,
   isRunning: false, isPaused: false, blockNumber: 0, sessionStartTime: 0,
   sequence: [], currentIndex: 0, scoredCount: 0, blockScore: 0, blockCorrectRejections: 0,
+  blockTargetsSeen: 0,
   totalScore: 0, totalTrials: 0, totalCorrect: 0, blockScores: [],
   bestStreak: 0, currentStreak: 0,
   timer: null, isiTimer: null, canRespond: false, responded: false, isTarget: false, currentMode: null
@@ -1171,22 +1171,71 @@ function isCurrentTarget(sequence, index, n) {
 function generateSequence(n, targetCount) {
   const items = getAllItems();
   const totalLength = n + 20;
+  const scoredStart = n, scoredEnd = totalLength;
+
+  // Build sequence with exactly targetCount targets using deterministic placement
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const sequence = [];
+    for (let i = 0; i < totalLength; i++) {
+      sequence.push(items[Math.floor(Math.random() * items.length)]);
+    }
+
+    // Fix targets: first remove excess targets, then add missing ones
+    let currentTargets = 0;
+    for (let i = scoredStart; i < scoredEnd; i++) {
+      if (isCurrentTarget(sequence, i, n)) currentTargets++;
+    }
+
+    // Remove excess targets
+    let guard = 0;
+    while (currentTargets > targetCount && guard < 500) {
+      const targetPositions = [];
+      for (let i = scoredStart; i < scoredEnd; i++) {
+        if (isCurrentTarget(sequence, i, n)) targetPositions.push(i);
+      }
+      if (targetPositions.length === 0) break;
+      const idx = targetPositions[Math.floor(Math.random() * targetPositions.length)];
+      const nextItem = getNextItem(sequence[idx - n]);
+      let randomItem;
+      do {
+        randomItem = items[Math.floor(Math.random() * items.length)];
+      } while (randomItem === nextItem);
+      sequence[idx] = randomItem;
+      currentTargets--;
+      guard++;
+    }
+
+    // Add missing targets
+    guard = 0;
+    while (currentTargets < targetCount && guard < 500) {
+      const nonTargetPositions = [];
+      for (let i = scoredStart; i < scoredEnd; i++) {
+        if (!isCurrentTarget(sequence, i, n)) nonTargetPositions.push(i);
+      }
+      if (nonTargetPositions.length === 0) break;
+      const idx = nonTargetPositions[Math.floor(Math.random() * nonTargetPositions.length)];
+      sequence[idx] = getNextItem(sequence[idx - n]);
+      currentTargets++;
+      guard++;
+    }
+
+    if (currentTargets === targetCount) return sequence;
+  }
+
+  // Ultimate fallback: construct sequence manually with exactly targetCount targets
   const sequence = [];
-  for (let i = 0; i < totalLength; i++) sequence.push(items[Math.floor(Math.random() * items.length)]);
-  const scoredStart = n, scoredEnd = totalLength, scoredLength = scoredEnd - scoredStart;
-  let currentTargets = 0;
-  for (let i = scoredStart; i < scoredEnd; i++) if (isCurrentTarget(sequence, i, n)) currentTargets++;
-  let attempts = 0;
-  while (currentTargets !== targetCount && attempts < 2000) {
-    const idx = scoredStart + Math.floor(Math.random() * scoredLength);
-    const randomItem = items[Math.floor(Math.random() * items.length)];
-    const oldItem = sequence[idx];
-    sequence[idx] = randomItem;
-    let newCount = 0;
-    for (let i = scoredStart; i < scoredEnd; i++) if (isCurrentTarget(sequence, i, n)) newCount++;
-    if (Math.abs(newCount - targetCount) <= Math.abs(currentTargets - targetCount)) currentTargets = newCount;
-    else sequence[idx] = oldItem;
-    attempts++;
+  for (let i = 0; i < totalLength; i++) {
+    sequence.push(items[Math.floor(Math.random() * items.length)]);
+  }
+  // Force exactly targetCount targets at fixed positions
+  const positions = [];
+  for (let i = 0; i < targetCount; i++) {
+    positions.push(n + Math.floor(i * 20 / targetCount));
+  }
+  for (const pos of positions) {
+    if (pos < totalLength) {
+      sequence[pos] = getNextItem(sequence[pos - n]);
+    }
   }
   return sequence;
 }
@@ -1325,8 +1374,7 @@ function applySettingsToUI() {
   els.isiValue.textContent = `${state.isiDuration}ms`;
   els.blocksPerSession.value = state.blocksPerSession;
   els.blocksValue.textContent = state.blocksPerSession;
-  els.targetsPerBlock.value = state.targetsPerBlock;
-  els.targetsValue.textContent = state.targetsPerBlock;
+  // Targets per block is fixed at 6 — no UI sync needed
   els.themeSelect.value = state.theme;
   document.body.setAttribute('data-theme', state.theme);
   els.feedbackToggleSetting.classList.toggle('active', state.feedbackEnabled);
@@ -1365,6 +1413,7 @@ function nextBlock() {
   if (state.blockNumber > state.blocksPerSession) { endSession(); return; }
   state.sequence = generateSequence(state.nLevel, state.targetsPerBlock);
   state.currentIndex = 0; state.scoredCount = 0; state.blockScore = 0; state.blockCorrectRejections = 0;
+  state.blockTargetsSeen = 0; state.hasCorrect = false;
   updateStats(); updateRuleInfo();
   showFeedback(`Block ${state.blockNumber} — ${state.nLevel}-Back`, 'correct');
   setTimeout(() => { if (state.isRunning && !state.isPaused) presentNext(); }, 1200);
@@ -1377,6 +1426,7 @@ function presentNext() {
   state.currentMode = getModeForItem(item);
   const isWarmUp = state.currentIndex < state.nLevel;
   state.isTarget = !isWarmUp && isCurrentTarget(state.sequence, state.currentIndex, state.nLevel);
+  if (state.isTarget) state.blockTargetsSeen++;
   state.responded = false; state.canRespond = true;
   renderStimulus(item);
   els.stimulus.classList.add('active');
@@ -1384,22 +1434,27 @@ function presentNext() {
   state.timer = setTimeout(() => {
     els.stimulus.classList.remove('active');
     state.canRespond = false;
-    if (state.isTarget && !state.responded) {
-      // Missed match — incorrect
-      state.totalTrials++; state.currentStreak = 0; updateCombo();
-      showFeedback('Missed!', 'miss'); triggerMissVFX(); audio.playMiss(); updateStats();
-    } else if (!state.isTarget && !state.responded) {
-      // Correct non-match response — correct rejection
-      state.blockCorrectRejections++;
-      state.totalTrials++; state.totalCorrect++;
-      state.blockScore++;
-      state.totalScore++;
-      state.currentStreak++; if (state.currentStreak > state.bestStreak) state.bestStreak = state.currentStreak;
-      updateCombo();
+    // Only score trials after warm-up (from the 1st scored trial onward)
+    if (!isWarmUp) {
+      if (state.isTarget && !state.responded) {
+        // Missed match — incorrect
+        state.totalTrials++; state.currentStreak = 0; updateCombo();
+        showFeedback('Missed!', 'miss'); triggerMissVFX(); audio.playMiss(); updateStats();
+      } else if (!state.isTarget && !state.responded) {
+        // Correct non-match response — correct rejection
+        // Correct non-match response — correct rejection
+        state.blockCorrectRejections++;
+        state.totalTrials++; state.totalCorrect++;
+        state.blockScore++;
+        state.totalScore++;
+        state.currentStreak++; if (state.currentStreak > state.bestStreak) state.bestStreak = state.currentStreak;
+        updateCombo();
+      }
     }
     state.isiTimer = setTimeout(() => {
       state.currentIndex++;
-      if (state.currentIndex >= state.nLevel) state.scoredCount++;
+      // Only count scored trials (within the 20-trial scored portion)
+      if (state.currentIndex > state.nLevel && state.currentIndex <= state.nLevel + 20) state.scoredCount++;
       updateStats(); presentNext();
     }, state.isiDuration);
   }, state.stimulusDuration);
@@ -1423,10 +1478,14 @@ function handleResponse(mode) {
 function endBlock() {
   state.blockScores.push(state.blockScore);
   audio.playBlockComplete();
-  // Study adaptive protocol: 19-20 correct → N+1, 16-18 → stays, 0-15 → N-1 (min 1)
+  // Adaptive protocol scales with target count:
+  // >90% correct → N+1 | ≥25% incorrect → N-1 | otherwise stays
+  const totalTrials = 20;
+  const correctPct = state.blockScore / totalTrials;
+  const incorrectPct = 1 - correctPct;
   let newN = state.nLevel;
-  if (state.blockScore >= 19) newN = state.nLevel + 1;
-  else if (state.blockScore <= 15) newN = Math.max(1, state.nLevel - 1);
+  if (correctPct > 0.9) newN = state.nLevel + 1;
+  else if (incorrectPct >= 0.25) newN = Math.max(1, state.nLevel - 1);
   if (newN !== state.nLevel) {
     const direction = newN > state.nLevel ? 'up' : 'down';
     state.nLevel = newN;
@@ -1451,7 +1510,7 @@ function endSession() {
     totalCorrect: state.totalCorrect, finalN: state.nLevel, bestStreak: state.bestStreak,
     blockScores: state.blockScores, durationMs: duration, modes: [...state.activeModes]
   });
-  // Session completed — update the main menu N-level to the final achieved level
+  // Session completed — keep the final achieved N-level for next session
   saveSettings();
   els.gameArea.classList.add('hidden'); els.summaryCard.classList.remove('hidden');
   els.pauseBtn.classList.add('hidden'); els.quitBtn.classList.add('hidden');
@@ -1512,7 +1571,7 @@ els.nLevel.addEventListener('input', e => { state.nLevel = parseInt(e.target.val
 els.stimulusDuration.addEventListener('input', e => { state.stimulusDuration = parseInt(e.target.value); els.durationValue.textContent = `${state.stimulusDuration}ms`; saveSettings(); });
 els.isiDuration.addEventListener('input', e => { state.isiDuration = parseInt(e.target.value); els.isiValue.textContent = `${state.isiDuration}ms`; saveSettings(); });
 els.blocksPerSession.addEventListener('input', e => { state.blocksPerSession = parseInt(e.target.value); els.blocksValue.textContent = state.blocksPerSession; saveSettings(); });
-els.targetsPerBlock.addEventListener('input', e => { state.targetsPerBlock = parseInt(e.target.value); els.targetsValue.textContent = state.targetsPerBlock; saveSettings(); });
+// Targets per block is fixed at 6 — no event listener needed
 els.themeSelect.addEventListener('change', e => setTheme(e.target.value));
 els.feedbackToggleSetting.addEventListener('click', () => {
   state.feedbackEnabled = !state.feedbackEnabled;
