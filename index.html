@@ -437,6 +437,21 @@ body[data-theme="sunset"]::before {
 .explainer-content .example-sequence .stim.target { border-color: var(--success); color: var(--success); }
 .explainer-content .example-sequence .stim.nontarget { border-color: var(--error); color: var(--error); }
 
+/* ============ N-BACK INDICATOR ============ */
+.nback-indicator {
+  display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+  padding: 0.6rem 1.5rem; width: 100%; max-width: 400px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: all 0.3s ease;
+}
+.nback-indicator-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.nback-indicator-value { font-size: 1.25rem; font-weight: 800; color: var(--accent-light); }
+.nback-indicator.level-up { border-color: var(--success); box-shadow: 0 0 20px var(--success-glow); }
+.nback-indicator.level-down { border-color: var(--error); box-shadow: 0 0 20px var(--error-glow); }
+.nback-indicator.level-up .nback-indicator-value { color: var(--success); }
+.nback-indicator.level-down .nback-indicator-value { color: var(--error); }
+
 /* ============ GAME AREA ============ */
 .game-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.75rem; }
 .stats-bar { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; }
@@ -863,6 +878,11 @@ body[data-theme="sunset"]::before {
 
   <!-- ============ GAME AREA ============ -->
   <div class="game-area hidden" id="gameArea">
+    <!-- N-Back Indicator Bar -->
+    <div class="nback-indicator" id="nbackIndicator">
+      <span class="nback-indicator-label">Current Level</span>
+      <span class="nback-indicator-value" id="nbackIndicatorValue">2-Back</span>
+    </div>
     <div class="stats-bar">
       <div class="stat"><div class="stat-value" id="blockNum">1</div><div class="stat-label">Block</div></div>
       <div class="stat"><div class="stat-value" id="trialNum">0/20</div><div class="stat-label">Trial</div></div>
@@ -1070,6 +1090,7 @@ const state = {
   modeKeys: { days: 'j', months: 'k', alphabet: 'l', shapes: ';' },
   feedbackEnabled: true,
   theme: 'default',
+  sessionStartN: 2,
   isRunning: false, isPaused: false, blockNumber: 0, sessionStartTime: 0,
   sequence: [], currentIndex: 0, scoredCount: 0, blockScore: 0,
   totalScore: 0, totalTrials: 0, totalCorrect: 0, blockScores: [],
@@ -1103,7 +1124,9 @@ const els = {
   telStreak: document.getElementById('telStreak'), telTime: document.getElementById('telTime'),
   performanceChart: document.getElementById('performanceChart'), historyList: document.getElementById('historyList'),
   soundToggle: document.getElementById('soundToggle'),
-  comboDisplay: document.getElementById('comboDisplay'), comboValue: document.getElementById('comboValue')
+  comboDisplay: document.getElementById('comboDisplay'), comboValue: document.getElementById('comboValue'),
+  nbackIndicator: document.getElementById('nbackIndicator'),
+  nbackIndicatorValue: document.getElementById('nbackIndicatorValue')
 };
 
 // ============ HELPERS ============
@@ -1187,6 +1210,8 @@ function updateStats() {
   els.score.textContent = state.totalScore;
   els.streak.textContent = state.currentStreak;
   els.accuracy.textContent = state.totalTrials > 0 ? `${Math.round((state.totalCorrect / state.totalTrials) * 100)}%` : '--';
+  // Update N-back indicator
+  els.nbackIndicatorValue.textContent = `${state.nLevel}-Back`;
 }
 
 function updateRuleInfo() {
@@ -1213,6 +1238,10 @@ function showFeedback(text, type) {
 
 function flashStimulus(cls) {
   if (!state.feedbackEnabled) return;
+  // Clear any existing flash classes first for clean transition
+  els.stimulus.classList.remove('target-flash', 'miss-flash', 'active');
+  // Force reflow to ensure clean state
+  void els.stimulus.offsetWidth;
   els.stimulus.classList.add(cls);
   setTimeout(() => els.stimulus.classList.remove(cls), 300);
 }
@@ -1322,6 +1351,7 @@ function startSession() {
   state.blockNumber = 0; state.totalScore = 0; state.totalTrials = 0; state.totalCorrect = 0;
   state.blockScores = []; state.currentStreak = 0; state.bestStreak = 0;
   state.sessionStartTime = Date.now();
+  state.sessionStartN = state.nLevel; // Record starting N-level
   els.mainMenu.classList.add('hidden'); els.summaryCard.classList.add('hidden');
   els.gameArea.classList.remove('hidden');
   els.pauseBtn.classList.remove('hidden'); els.quitBtn.classList.remove('hidden');
@@ -1388,7 +1418,16 @@ function endBlock() {
   let newN = state.nLevel;
   if (state.blockScore >= 19) newN = state.nLevel + 1;
   else if (state.blockScore <= 15) newN = Math.max(1, state.nLevel - 1);
-  if (newN !== state.nLevel) { state.nLevel = newN; showFeedback(`N adjusted to ${newN}-Back`, 'correct'); }
+  if (newN !== state.nLevel) {
+    const direction = newN > state.nLevel ? 'up' : 'down';
+    state.nLevel = newN;
+    // Flash the N-back indicator to show level change
+    els.nbackIndicator.classList.remove('level-up', 'level-down');
+    void els.nbackIndicator.offsetWidth; // Force reflow
+    els.nbackIndicator.classList.add(direction === 'up' ? 'level-up' : 'level-down');
+    showFeedback(`N adjusted to ${newN}-Back`, 'correct');
+    setTimeout(() => els.nbackIndicator.classList.remove('level-up', 'level-down'), 2000);
+  }
   updateStats();
   setTimeout(() => { if (state.isRunning) nextBlock(); }, 1500);
 }
@@ -1403,6 +1442,8 @@ function endSession() {
     totalCorrect: state.totalCorrect, finalN: state.nLevel, bestStreak: state.bestStreak,
     blockScores: state.blockScores, durationMs: duration, modes: [...state.activeModes]
   });
+  // Session completed — update the main menu N-level to the final achieved level
+  saveSettings();
   els.gameArea.classList.add('hidden'); els.summaryCard.classList.remove('hidden');
   els.pauseBtn.classList.add('hidden'); els.quitBtn.classList.add('hidden');
   els.finalN.textContent = state.nLevel; els.finalScore.textContent = state.totalScore; els.finalAccuracy.textContent = `${finalAcc}%`;
@@ -1419,6 +1460,10 @@ function togglePause() {
 function quitToMenu() {
   state.isRunning = false; state.isPaused = false;
   clearTimeout(state.timer); clearTimeout(state.isiTimer);
+  // Session NOT completed — restore the N-level from before this session started
+  state.nLevel = state.sessionStartN;
+  saveSettings();
+  applySettingsToUI();
   els.gameArea.classList.add('hidden'); els.summaryCard.classList.add('hidden');
   els.mainMenu.classList.remove('hidden');
   els.pauseBtn.classList.add('hidden'); els.quitBtn.classList.add('hidden');
