@@ -403,6 +403,42 @@ body[data-theme="sunset"]::before {
   50% { box-shadow: 0 0 0 6px transparent; }
 }
 
+/* Per-mode presentation: visual / auditory */
+.mode-pres {
+  display: flex; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: var(--radius-xs); overflow: hidden;
+}
+.mode-pres .pres-btn {
+  padding: 0.35rem 0.6rem; background: var(--bg-card); border: none; cursor: pointer;
+  color: var(--text-muted); font-family: inherit; font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.03em; white-space: nowrap; transition: all var(--transition);
+}
+.mode-pres .pres-btn + .pres-btn { border-left: 1px solid var(--border); }
+.mode-pres .pres-btn:hover { color: var(--text-primary); background: var(--bg-input); }
+.mode-pres .pres-btn.active { background: var(--accent); color: #fff; }
+
+/* Panel headers (title + badge/buttons) */
+.settings-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+}
+.settings-header .card-title { margin-bottom: 0; }
+.settings-header-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.last-session-badge {
+  font-size: 0.72rem; font-weight: 700; color: var(--accent-light);
+  background: rgba(139, 92, 246, 0.12); border: 1px solid var(--border);
+  padding: 0.35rem 0.7rem; border-radius: 999px; white-space: nowrap;
+}
+.btn-outline {
+  padding: 0.45rem 0.9rem; font-size: 0.75rem; font-weight: 700;
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--bg-input); color: var(--text-secondary);
+  cursor: pointer; font-family: inherit; transition: all var(--transition); white-space: nowrap;
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent-light); }
+.btn-outline.danger:hover { border-color: var(--error, #ef4444); color: var(--error, #ef4444); }
+.btn-outline.confirmed { border-color: var(--success, #10b981); color: var(--success, #10b981); }
+
 /* ============ EXPLAINER ============ */
 .explainer-content { line-height: 1.8; color: var(--text-secondary); font-size: 0.92rem; }
 .explainer-content h3 {
@@ -677,7 +713,13 @@ body[data-theme="sunset"]::before {
   <!-- ============ SETTINGS TAB ============ -->
   <div class="tab-content active" id="tab-settings">
     <div class="card settings-panel">
-      <div class="card-title">⚙️ Customize Your Session</div>
+      <div class="settings-header">
+        <div class="card-title" style="margin-bottom:0">⚙️ Customize Your Session</div>
+        <div class="settings-header-actions">
+          <span class="last-session-badge" id="lastSessionBadge" title="Your N-level after completing your last full session">Last session: —</span>
+          <button class="btn-outline" id="resetStudyBtn" title="Restore every setting to the standard protocol used in the study">🔬 Reset to Study Settings</button>
+        </div>
+      </div>
       <div class="settings-grid">
         <div class="setting-group">
           <label>🎯 N-Back Level <span class="info-icon">i<span class="info-tooltip">The number of positions back to compare against. Higher N = harder. Starts at 2 and adapts based on performance.</span></span></label>
@@ -743,6 +785,10 @@ body[data-theme="sunset"]::before {
             <div class="mode-name">📅 Days of the Week</div>
             <div class="mode-desc">MON → TUE → WED → THU → FRI → SAT → SUN</div>
           </div>
+          <div class="mode-pres" data-mode="days" title="Visual: shown on screen. Auditory: spoken aloud instead.">
+            <button type="button" class="pres-btn active" data-mode="days" data-pres="visual">👁 Visual</button>
+            <button type="button" class="pres-btn" data-mode="days" data-pres="auditory">🔊 Auditory</button>
+          </div>
           <button class="mode-key" data-mode="days">J</button>
         </div>
         <div class="mode-item active" data-mode="months">
@@ -750,6 +796,10 @@ body[data-theme="sunset"]::before {
           <div class="mode-info">
             <div class="mode-name">📆 Months</div>
             <div class="mode-desc">JAN → FEB → MAR → ... → DEC</div>
+          </div>
+          <div class="mode-pres" data-mode="months" title="Visual: shown on screen. Auditory: spoken aloud instead.">
+            <button type="button" class="pres-btn active" data-mode="months" data-pres="visual">👁 Visual</button>
+            <button type="button" class="pres-btn" data-mode="months" data-pres="auditory">🔊 Auditory</button>
           </div>
           <button class="mode-key" data-mode="months">K</button>
         </div>
@@ -759,7 +809,11 @@ body[data-theme="sunset"]::before {
             <div class="mode-name">🔤 Alphabet</div>
             <div class="mode-desc">A → B → C → ... → Z</div>
           </div>
-          <button class="mode-key" data-mode="alphabet">L</button>
+          <div class="mode-pres" data-mode="alphabet" title="Visual: shown on screen. Auditory: spoken aloud instead.">
+            <button type="button" class="pres-btn active" data-mode="alphabet" data-pres="visual">👁 Visual</button>
+            <button type="button" class="pres-btn" data-mode="alphabet" data-pres="auditory">🔊 Auditory</button>
+          </div>
+          <button class="mode-key" data-mode="alphabet">S</button>
         </div>
         <div class="mode-item active" data-mode="shapes">
           <div class="mode-check">✓</div>
@@ -767,11 +821,15 @@ body[data-theme="sunset"]::before {
             <div class="mode-name">🔷 Shapes</div>
             <div class="mode-desc">Circle → Square → Triangle → Diamond → Pentagon → Hexagon → Star → Cross</div>
           </div>
-          <button class="mode-key" data-mode="shapes">;</button>
+          <div class="mode-pres" data-mode="shapes" title="Visual: shown on screen. Auditory: spoken aloud instead.">
+            <button type="button" class="pres-btn active" data-mode="shapes" data-pres="visual">👁 Visual</button>
+            <button type="button" class="pres-btn" data-mode="shapes" data-pres="auditory">🔊 Auditory</button>
+          </div>
+          <button class="mode-key" data-mode="shapes">D</button>
         </div>
       </div>
       <p style="margin-top:1rem;font-size:0.78rem;color:var(--text-muted)">
-        💡 Click a key button then press any key to rebind. Each mode has its own independent response key. When multiple modes are active, stimuli from all selected modes are mixed together — press the key matching the current stimulus type.
+        💡 Click a key button then press any key to rebind — each mode has its own independent response key, and <strong>clicking anywhere in the game area also counts as a response</strong>. Pick <strong>Visual</strong> (stimulus shown on screen) or <strong>Auditory</strong> (stimulus spoken aloud) for each mode. When multiple modes are active, stimuli from all selected modes are mixed together — respond with the key matching the current stimulus type.
       </p>
     </div>
 
@@ -874,7 +932,10 @@ body[data-theme="sunset"]::before {
   <!-- ============ PROGRESS TAB ============ -->
   <div class="tab-content" id="tab-progress">
     <div class="card telemetry-panel">
-      <div class="card-title">📈 Your Progress</div>
+      <div class="settings-header">
+        <div class="card-title" style="margin-bottom:0">📈 Your Progress</div>
+        <button class="btn-outline danger" id="clearDataBtn" title="Delete your session history, block-score chart and all progress stats">🗑️ Clear Progress Data</button>
+      </div>
       <div class="telemetry-grid">
         <div class="telemetry-stat"><div class="value" id="telSessions">0</div><div class="label">Sessions</div></div>
         <div class="telemetry-stat"><div class="value" id="telBlocks">0</div><div class="label">Blocks</div></div>
@@ -1105,6 +1166,10 @@ class Telemetry {
   }
   getRecentScores() { return this.data.recentScores.slice(-20); }
   getSessionHistory() { return this.data.sessions.slice(-10).reverse(); }
+  clearAll() {
+    this.data = { sessions: [], totalBlocks: 0, totalTrials: 0, totalCorrect: 0, totalTimeMs: 0, bestN: 0, bestStreak: 0, recentScores: [] };
+    this.save();
+  }
 }
 const telemetry = new Telemetry();
 
@@ -1114,16 +1179,18 @@ const state = {
   responseVisual: 'cross', responseImageURL: '',
   blocksPerSession: 20, targetsPerBlock: 6,
   activeModes: ['days', 'months', 'alphabet', 'shapes'],
-  modeKeys: { days: 'j', months: 'k', alphabet: 'l', shapes: ';' },
+  modeKeys: { days: 'j', months: 'k', alphabet: 's', shapes: 'd' },
+  modePresentation: { days: 'visual', months: 'visual', alphabet: 'visual', shapes: 'visual' },
+  lastSessionN: null,
   feedbackEnabled: true,
   theme: 'default',
-  sessionStartN: 2,
   isRunning: false, isPaused: false, blockNumber: 0, sessionStartTime: 0,
   sequence: [], currentIndex: 0, scoredCount: 0, blockScore: 0, blockCorrectRejections: 0,
   blockTargetsSeen: 0,
   totalScore: 0, totalTrials: 0, totalCorrect: 0, blockScores: [],
   bestStreak: 0, currentStreak: 0,
-  timer: null, isiTimer: null, respTimer: null, canRespond: false, responded: false, isTarget: false, currentMode: null
+  timer: null, isiTimer: null, respTimer: null, introTimer: null, blockEndTimer: null, pendingNext: null,
+  canRespond: false, responded: false, isTarget: false, currentMode: null
 };
 
 // ============ DOM ELEMENTS ============
@@ -1154,6 +1221,9 @@ const els = {
   telStreak: document.getElementById('telStreak'), telTime: document.getElementById('telTime'),
   performanceChart: document.getElementById('performanceChart'), historyList: document.getElementById('historyList'),
   soundToggle: document.getElementById('soundToggle'),
+  lastSessionBadge: document.getElementById('lastSessionBadge'),
+  resetStudyBtn: document.getElementById('resetStudyBtn'),
+  clearDataBtn: document.getElementById('clearDataBtn'),
   comboDisplay: document.getElementById('comboDisplay'), comboValue: document.getElementById('comboValue'),
   nbackIndicator: document.getElementById('nbackIndicator'),
   nbackIndicatorValue: document.getElementById('nbackIndicatorValue')
@@ -1248,6 +1318,28 @@ function renderStimulus(item) {
   }
 }
 
+// ============ AUDITORY PRESENTATION ============
+const SPEECH_TEXT = {
+  MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday', FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday',
+  JAN: 'January', FEB: 'February', MAR: 'March', APR: 'April', MAY: 'May', JUN: 'June',
+  JUL: 'July', AUG: 'August', SEP: 'September', OCT: 'October', NOV: 'November', DEC: 'December'
+};
+
+function speakStimulus(item) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    const text = (item && typeof item === 'object') ? item.name : (SPEECH_TEXT[item] || String(item));
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(String(text));
+    u.rate = 0.95; u.pitch = 1; u.lang = 'en-US';
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+function stopSpeech() {
+  try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch (e) {}
+}
+
 function updateProgressRing(progress) {
   const c = 2 * Math.PI * 100;
   els.progressCircle.style.strokeDashoffset = c * (1 - progress);
@@ -1333,7 +1425,7 @@ function setTheme(theme) {
 // ============ SETTINGS PERSISTENCE ============
 function saveSettings() {
   const settings = {
-    v: 2,
+    v: 3,
     nLevel: state.nLevel,
     stimulusDuration: state.stimulusDuration,
     isiDuration: state.isiDuration,
@@ -1343,6 +1435,8 @@ function saveSettings() {
     targetsPerBlock: state.targetsPerBlock,
     activeModes: state.activeModes,
     modeKeys: state.modeKeys,
+    modePresentation: state.modePresentation,
+    lastSessionN: state.lastSessionN,
     feedbackEnabled: state.feedbackEnabled,
     soundEnabled: audio.enabled,
     theme: state.theme
@@ -1367,6 +1461,11 @@ function loadSettings() {
     if (s.targetsPerBlock) state.targetsPerBlock = s.targetsPerBlock;
     if (s.activeModes && s.activeModes.length > 0) state.activeModes = s.activeModes;
     if (s.modeKeys) state.modeKeys = { ...state.modeKeys, ...s.modeKeys };
+    // v3: standard response keys are now Alphabet = S and Shapes = D —
+    // adopt them when loading settings saved before that change
+    if (!s.v || s.v < 3) { state.modeKeys.alphabet = 's'; state.modeKeys.shapes = 'd'; }
+    if (s.modePresentation) state.modePresentation = { ...state.modePresentation, ...s.modePresentation };
+    if (s.lastSessionN !== undefined) state.lastSessionN = s.lastSessionN;
     if (s.feedbackEnabled !== undefined) state.feedbackEnabled = s.feedbackEnabled;
     if (s.soundEnabled !== undefined) audio.enabled = s.soundEnabled;
     if (s.theme) state.theme = s.theme;
@@ -1401,16 +1500,34 @@ function applySettingsToUI() {
     const keyBtn = item.querySelector('.mode-key');
     if (keyBtn) keyBtn.textContent = (state.modeKeys[mode] || '').toUpperCase();
   });
+  updatePresentationUI();
+  updateLastSessionBadge();
+}
+
+function updatePresentationUI() {
+  document.querySelectorAll('.mode-pres').forEach(group => {
+    const current = state.modePresentation[group.dataset.mode] || 'visual';
+    group.querySelectorAll('.pres-btn').forEach(b => b.classList.toggle('active', b.dataset.pres === current));
+  });
+}
+
+function updateLastSessionBadge() {
+  els.lastSessionBadge.textContent = state.lastSessionN
+    ? `Last session: ${state.lastSessionN}-Back`
+    : 'Last session: —';
 }
 
 // ============ GAME FLOW ============
 function startSession() {
   audio.init(); audio.playStart();
+  // Cancel any timers left over from a previous/aborted session
+  clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer);
+  clearTimeout(state.introTimer); clearTimeout(state.blockEndTimer);
+  state.pendingNext = null;
   state.isRunning = true; state.isPaused = false;
   state.blockNumber = 0; state.totalScore = 0; state.totalTrials = 0; state.totalCorrect = 0;
   state.blockScores = []; state.currentStreak = 0; state.bestStreak = 0;
   state.sessionStartTime = Date.now();
-  state.sessionStartN = state.nLevel; // Record starting N-level
   els.mainMenu.classList.add('hidden'); els.summaryCard.classList.add('hidden');
   els.gameArea.classList.remove('hidden');
   els.pauseBtn.classList.remove('hidden'); els.quitBtn.classList.remove('hidden');
@@ -1427,7 +1544,8 @@ function nextBlock() {
   state.blockTargetsSeen = 0;
   updateStats(); updateRuleInfo();
   showFeedback(`Block ${state.blockNumber} — ${state.nLevel}-Back`, 'correct');
-  setTimeout(() => { if (state.isRunning && !state.isPaused) presentNext(); }, 1200);
+  state.pendingNext = 'trial';
+  state.introTimer = setTimeout(() => { state.pendingNext = null; if (state.isRunning && !state.isPaused) presentNext(); }, 1200);
 }
 
 // ============ RESPONSE-PERIOD VISUAL ============
@@ -1466,7 +1584,14 @@ function presentNext() {
   state.isTarget = !isWarmUp && isCurrentTarget(state.sequence, state.currentIndex, state.nLevel);
   if (state.isTarget) state.blockTargetsSeen++;
   state.responded = false; state.canRespond = true;
-  renderStimulus(item);
+  // Visual mode: show the stimulus. Auditory mode: speak it aloud instead of showing it.
+  stopSpeech();
+  if ((state.modePresentation[state.currentMode] || 'visual') === 'auditory') {
+    els.stimulus.innerHTML = '';
+    speakStimulus(item);
+  } else {
+    renderStimulus(item);
+  }
   els.stimulus.classList.add('active');
   hideResponseVisual();
   updateProgressRing(state.currentIndex / state.sequence.length);
@@ -1542,12 +1667,16 @@ function endBlock() {
     setTimeout(() => els.nbackIndicator.classList.remove('level-up', 'level-down'), 2000);
   }
   updateStats();
-  setTimeout(() => { if (state.isRunning) nextBlock(); }, 1500);
+  state.pendingNext = 'block';
+  state.blockEndTimer = setTimeout(() => { state.pendingNext = null; if (state.isRunning) nextBlock(); }, 1500);
 }
 
 function endSession() {
   state.isRunning = false;
-  clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer); hideResponseVisual();
+  clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer);
+  clearTimeout(state.introTimer); clearTimeout(state.blockEndTimer);
+  state.pendingNext = null;
+  hideResponseVisual(); stopSpeech();
   const duration = Date.now() - state.sessionStartTime;
   const finalAcc = state.totalTrials > 0 ? Math.round((state.totalCorrect / state.totalTrials) * 100) : 0;
   telemetry.recordSession({
@@ -1555,8 +1684,10 @@ function endSession() {
     totalCorrect: state.totalCorrect, finalN: state.nLevel, bestStreak: state.bestStreak,
     blockScores: state.blockScores, durationMs: duration, modes: [...state.activeModes]
   });
-  // Session completed — keep the final achieved N-level for next session
+  // Session COMPLETED — record the final N-level shown on the main page
+  state.lastSessionN = state.nLevel;
   saveSettings();
+  updateLastSessionBadge();
   els.gameArea.classList.add('hidden'); els.summaryCard.classList.remove('hidden');
   els.pauseBtn.classList.add('hidden'); els.quitBtn.classList.add('hidden');
   els.finalN.textContent = state.nLevel; els.finalScore.textContent = state.totalScore; els.finalAccuracy.textContent = `${finalAcc}%`;
@@ -1566,15 +1697,27 @@ function endSession() {
 function togglePause() {
   if (!state.isRunning) return;
   state.isPaused = !state.isPaused;
-  if (state.isPaused) { clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer); els.stimulus.classList.remove('active'); hideResponseVisual(); els.pauseBtn.textContent = 'Resume'; }
-  else { els.pauseBtn.textContent = 'Pause'; presentNext(); }
+  if (state.isPaused) {
+    clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer);
+    clearTimeout(state.introTimer); clearTimeout(state.blockEndTimer);
+    els.stimulus.classList.remove('active'); hideResponseVisual(); stopSpeech(); els.pauseBtn.textContent = 'Resume';
+  } else {
+    els.pauseBtn.textContent = 'Pause';
+    // Resume whatever the session was waiting for: the next block, or the next trial
+    if (state.pendingNext === 'block') { state.pendingNext = null; nextBlock(); }
+    else { state.pendingNext = null; presentNext(); }
+  }
 }
 
 function quitToMenu() {
   state.isRunning = false; state.isPaused = false;
-  clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer); hideResponseVisual();
-  // Session NOT completed — restore the N-level from before this session started
-  state.nLevel = state.sessionStartN;
+  clearTimeout(state.timer); clearTimeout(state.isiTimer); clearTimeout(state.respTimer);
+  clearTimeout(state.introTimer); clearTimeout(state.blockEndTimer);
+  state.pendingNext = null;
+  hideResponseVisual(); stopSpeech();
+  // Exiting before the session's target block count is reached: the N-level
+  // stays exactly where it is (no revert). The "Last session" badge only
+  // updates when a session is actually completed.
   saveSettings();
   applySettingsToUI();
   els.gameArea.classList.add('hidden'); els.summaryCard.classList.add('hidden');
@@ -1594,10 +1737,14 @@ function refreshTelemetry() {
   if (scores.length > 0) {
     const max = Math.max(...scores, 20);
     els.performanceChart.innerHTML = scores.map(s => `<div class="chart-bar" style="height:${Math.max(4, (s / max) * 100)}%" data-value="${s}"></div>`).join('');
+  } else {
+    els.performanceChart.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:1rem">Complete a session to see your progress</div>';
   }
   const history = telemetry.getSessionHistory();
   if (history.length > 0) {
     els.historyList.innerHTML = `<table class="history-table"><thead><tr><th>Date</th><th>N</th><th>Score</th><th>Acc</th><th>Streak</th></tr></thead><tbody>${history.map(s => { const d = new Date(s.date); const a = s.totalTrials > 0 ? Math.round((s.totalCorrect / s.totalTrials) * 100) : 0; return `<tr><td>${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td><td>${s.finalN}</td><td class="${a>=70?'good':a<50?'bad':''}">${s.totalCorrect}/${s.totalTrials}</td><td>${a}%</td><td>${s.bestStreak}</td></tr>`; }).join('')}</tbody></table>`;
+  } else {
+    els.historyList.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem">No sessions yet</div>';
   }
 }
 
@@ -1693,6 +1840,79 @@ function flashKeyPress(mode) {
     setTimeout(() => item.classList.remove('pressed'), 200);
   }
 }
+
+// Per-mode presentation: visual (shown) vs auditory (spoken aloud)
+document.querySelectorAll('.pres-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation(); // don't also toggle the mode's active state
+    state.modePresentation[btn.dataset.mode] = btn.dataset.pres;
+    updatePresentationUI();
+    saveSettings();
+  });
+});
+
+// Clicking in the game area counts as a response too (not only the mode keys)
+els.gameArea.addEventListener('click', e => {
+  if (!state.isRunning || state.isPaused) return;
+  if (e.target.closest('button')) return; // leave pause/quit controls alone
+  if (!state.currentMode) return;
+  const alreadyResponded = state.responded;
+  handleResponse(state.currentMode);
+  if (state.responded && !alreadyResponded) flashKeyPress(state.currentMode);
+});
+
+// Reset every setting to the standard study protocol
+els.resetStudyBtn.addEventListener('click', () => {
+  const ok = confirm(
+    'Reset all settings to the standard study settings?\n\n' +
+    '• N-Back level: 1 (where the study began)\n' +
+    '• 20 blocks per session — 6 targets per block\n' +
+    '• Stimulus 500 ms — response symbol 2,500 ms\n' +
+    '• Fixation cross — feedback & sound enabled\n' +
+    '• Only the first mode (Days) active, Visual presentation\n' +
+    '• Standard response keys: J · K · S · D\n\n' +
+    'Theme and progress data are kept.'
+  );
+  if (!ok) return;
+  state.nLevel = 1;
+  state.stimulusDuration = 500;
+  state.isiDuration = 2500;
+  state.blocksPerSession = 20;
+  state.targetsPerBlock = 6;
+  state.responseVisual = 'cross';
+  state.responseImageURL = '';
+  state.feedbackEnabled = true;
+  audio.enabled = true;
+  state.activeModes = ['days'];
+  state.modePresentation = { days: 'visual', months: 'visual', alphabet: 'visual', shapes: 'visual' };
+  state.modeKeys = { days: 'j', months: 'k', alphabet: 's', shapes: 'd' };
+  saveSettings();
+  applySettingsToUI();
+  updateRuleInfo();
+  els.resetStudyBtn.textContent = '✅ Reset!';
+  els.resetStudyBtn.classList.add('confirmed');
+  setTimeout(() => {
+    els.resetStudyBtn.textContent = '🔬 Reset to Study Settings';
+    els.resetStudyBtn.classList.remove('confirmed');
+  }, 1500);
+});
+
+// Clear everything shown in the progress chart
+els.clearDataBtn.addEventListener('click', () => {
+  const ok = confirm(
+    'Clear your progress data?\n\n' +
+    'This permanently deletes the session history, the block-score chart and every progress stat. Your settings are kept.'
+  );
+  if (!ok) return;
+  telemetry.clearAll();
+  refreshTelemetry();
+  els.clearDataBtn.textContent = '✅ Cleared';
+  els.clearDataBtn.classList.add('confirmed');
+  setTimeout(() => {
+    els.clearDataBtn.textContent = '🗑️ Clear Progress Data';
+    els.clearDataBtn.classList.remove('confirmed');
+  }, 1500);
+});
 
 els.startBtn.addEventListener('click', startSession);
 els.pauseBtn.addEventListener('click', togglePause);
